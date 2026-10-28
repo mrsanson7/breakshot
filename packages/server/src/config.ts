@@ -1,0 +1,27 @@
+/** Server settings from environment variables (see README → 배포). */
+export interface ServerConfig {
+  port: number;
+  host: string;
+  /** Built client to serve (production). Empty = API/WebSocket only. */
+  staticDir: string;
+  /** Comma-separated allowed Origin headers for WebSocket upgrades; empty = allow all. */
+  allowedOrigins: string[];
+  maxRooms: number;
+  /** Room sweep interval (ms). */
+  sweepIntervalMs: number;
+}
+
+export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
+  const num = (v: string | undefined, d: number) => (v && Number.isFinite(Number(v)) ? Number(v) : d);
+  return {
+    port: num(env.PORT ?? env.SERVER_PORT, 8787),
+    host: env.HOST ?? '0.0.0.0',
+    staticDir: env.STATIC_DIR ?? '',
+    allowedOrigins: (env.ALLOWED_ORIGINS ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
+    maxRooms: num(env.MAX_ROOMS, 500),
+    sweepIntervalMs: num(env.SWEEP_INTERVAL_MS, 30_000),
+  };
+}

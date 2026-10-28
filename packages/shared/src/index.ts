@@ -22,3 +22,5 @@ export * from './rules/registry';
 export * from './rules/labels';
 export * from './net/settings';
 export * from './config/net';
+export * from './net/messages';
+export * from './game/lag';
