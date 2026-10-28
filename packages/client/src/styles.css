@@ -44,7 +44,7 @@ button, select, input { font: inherit; color: inherit; }
 .tagline { color: var(--muted); margin: 0 0 12px; }
 .menu { display: flex; flex-direction: column; gap: 10px; align-items: center; }
 .menu.row { flex-direction: row; justify-content: center; margin-top: 18px; }
-.mute { margin-top: 18px; }
+.mute { margin-top: 18px; justify-content: center; }
 
 /* Setup form */
 .form-body { max-width: 860px; margin: 0 auto; }
@@ -168,3 +168,14 @@ button, select, input { font: inherit; color: inherit; }
 @media (hover: hover) and (pointer: fine) and (min-width: 761px) {
   .fine-aim { display: none; }
 }
+
+/* 조작법 안내 */
+.overlay { position: fixed; inset: 0; z-index: 50; background: rgba(5, 8, 10, .7); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.help-panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; width: min(560px, 100%); max-height: 100%; overflow-y: auto; }
+.help-head { display: flex; align-items: center; justify-content: space-between; }
+.help-head h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 26px; }
+.help-panel h3 { font-size: 15px; margin: 16px 0 6px; }
+.help-list { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; margin: 0; font-size: 14px; }
+.help-list dt { color: var(--accent); font-weight: 700; }
+.help-list dd { margin: 0; color: var(--ink); }
+.btn.off { opacity: .45; }

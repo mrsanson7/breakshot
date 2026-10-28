@@ -1,7 +1,8 @@
 import type { MatchState } from '@breakshot/shared';
 import { PracticeSession } from './session/practice';
 import type { Session, ShotPlayback } from './session/types';
-import { sound } from './audio/sound';
+import { helpButton } from './ui/help';
+import { soundButtons } from './ui/soundButtons';
 import { clear, h } from './ui/dom';
 import { GameScreen } from './ui/gameScreen';
 import { resultScreen } from './ui/resultScreen';
@@ -37,11 +38,6 @@ export class App {
   }
 
   title(): void {
-    const mute = h('button.btn.ghost.mute', {}, sound.muted ? '🔇 소리 꺼짐' : '🔊 소리 켜짐');
-    mute.addEventListener('click', () => {
-      sound.setMuted(!sound.muted);
-      mute.textContent = sound.muted ? '🔇 소리 꺼짐' : '🔊 소리 켜짐';
-    });
     this.mount(
       h(
         'div.screen.title',
@@ -55,7 +51,7 @@ export class App {
           h('button.btn.big', { onclick: () => this.joinRoom() }, '방 참가'),
           h('button.btn.big', { onclick: () => this.practice() }, '연습 모드'),
         ),
-        mute,
+        h('div.row.mute', {}, ...soundButtons(true), helpButton('❓ 조작법')),
       ),
     );
   }

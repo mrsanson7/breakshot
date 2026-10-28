@@ -1,7 +1,110 @@
 import type { ShotEvent } from '@breakshot/shared';
+import { MUSIC } from '../config';
+
+const midiHz = (n: number) => 440 * 2 ** ((n - 69) / 12);
+
+/** Calm generative background music: slow pad chords plus an occasional soft bell note through a delay. */
+class Music {
+  private out: GainNode;
+  private pads: GainNode;
+  private bells: GainNode;
+  private timer: number | null = null;
+  private nextBeat = 0;
+  private beat = 0;
+
+  constructor(private readonly ctx: AudioContext, destination: AudioNode) {
+    this.out = ctx.createGain();
+    this.out.gain.value = 0;
+    this.out.connect(destination);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = MUSIC.padLowpassHz;
+    this.pads = ctx.createGain();
+    this.pads.connect(lp).connect(this.out);
+    this.bells = ctx.createGain();
+    this.bells.connect(this.out);
+    const delay = ctx.createDelay(2);
+    delay.delayTime.value = MUSIC.delaySeconds;
+    const fb = ctx.createGain();
+    fb.gain.value = MUSIC.delayFeedback;
+    this.bells.connect(delay).connect(fb).connect(delay);
+    fb.connect(this.out);
+  }
+
+  start(): void {
+    if (this.timer !== null) return;
+    const t = this.ctx.currentTime;
+    this.out.gain.cancelScheduledValues(t);
+    this.out.gain.setValueAtTime(this.out.gain.value, t);
+    this.out.gain.linearRampToValueAtTime(MUSIC.volume, t + MUSIC.fadeSeconds);
+    this.nextBeat = t + 0.1;
+    this.beat = 0;
+    this.timer = window.setInterval(() => this.schedule(), MUSIC.schedulerIntervalMs);
+    this.schedule();
+  }
+
+  stop(): void {
+    if (this.timer === null) return;
+    window.clearInterval(this.timer);
+    this.timer = null;
+    const t = this.ctx.currentTime;
+    this.out.gain.cancelScheduledValues(t);
+    this.out.gain.setValueAtTime(this.out.gain.value, t);
+    this.out.gain.linearRampToValueAtTime(0, t + MUSIC.fadeSeconds);
+  }
+
+  private schedule(): void {
+    const beatLen = 60 / MUSIC.bpm;
+    while (this.nextBeat < this.ctx.currentTime + MUSIC.lookaheadSeconds) {
+      if (this.beat % MUSIC.beatsPerChord === 0) {
+        const chord = MUSIC.chords[(this.beat / MUSIC.beatsPerChord) % MUSIC.chords.length];
+        for (const n of chord) this.pad(midiHz(n), this.nextBeat, beatLen * MUSIC.beatsPerChord);
+      }
+      if (this.beat % 2 === 1 && Math.random() < MUSIC.melodyChance) {
+        this.bell(midiHz(MUSIC.melody[Math.floor(Math.random() * MUSIC.melody.length)]), this.nextBeat);
+      }
+      this.nextBeat += beatLen;
+      this.beat++;
+    }
+  }
+
+  private pad(freq: number, t: number, len: number): void {
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.18, t + MUSIC.padAttackSeconds);
+    g.gain.setValueAtTime(0.18, t + len - MUSIC.padAttackSeconds / 2);
+    // Overlap into the next chord a little so the change is seamless.
+    g.gain.linearRampToValueAtTime(0, t + len + MUSIC.padAttackSeconds / 2);
+    g.connect(this.pads);
+    for (const cents of [-MUSIC.padDetuneCents, MUSIC.padDetuneCents]) {
+      const o = this.ctx.createOscillator();
+      o.type = 'triangle';
+      o.frequency.value = freq;
+      o.detune.value = cents;
+      o.connect(g);
+      o.start(t);
+      o.stop(t + len + MUSIC.padAttackSeconds);
+    }
+  }
+
+  private bell(freq: number, t: number): void {
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.25, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + MUSIC.noteDecaySeconds);
+    g.connect(this.bells);
+    const o = this.ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.value = freq;
+    o.connect(g);
+    o.start(t);
+    o.stop(t + MUSIC.noteDecaySeconds + 0.05);
+  }
+}
 
 /**
- * Synthesised sound effects (Web Audio API, no assets). Volumes scale with impact speed.
+ * Synthesised sound effects (Web Audio API, no assets) and background music, each with its own
+ * on/off switch. Volumes scale with impact speed.
  * The AudioContext is created lazily on the first user gesture (browser autoplay policy).
  */
 class Sound {
@@ -10,14 +113,24 @@ class Sound {
   private noise: AudioBuffer | null = null;
   private lastAt = 0;
   private burst = 0;
+  private music: Music | null = null;
+  /** Sound effects off. */
   muted = false;
+  musicOn = true;
 
   constructor() {
     try {
       this.muted = localStorage.getItem('breakshot.muted') === '1';
+      this.musicOn = localStorage.getItem('breakshot.music') !== '0';
     } catch {
       // storage unavailable: keep default
     }
+    // Pause everything while the tab is hidden.
+    document.addEventListener('visibilitychange', () => {
+      if (!this.ctx) return;
+      if (document.hidden) void this.ctx.suspend();
+      else void this.ctx.resume();
+    });
     const unlock = () => {
       this.ensure();
       window.removeEventListener('pointerdown', unlock);
@@ -36,6 +149,18 @@ class Sound {
     }
   }
 
+  setMusic(on: boolean): void {
+    this.musicOn = on;
+    try {
+      localStorage.setItem('breakshot.music', on ? '1' : '0');
+    } catch {
+      // ignore
+    }
+    if (on) this.ensure();
+    if (on) this.music?.start();
+    else this.music?.stop();
+  }
+
   private ensure(): AudioContext | null {
     if (this.ctx) {
       if (this.ctx.state === 'suspended') void this.ctx.resume();
@@ -51,6 +176,8 @@ class Sound {
     this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
     const d = this.noise.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    this.music = new Music(this.ctx, this.ctx.destination);
+    if (this.musicOn) this.music.start();
     return this.ctx;
   }
 

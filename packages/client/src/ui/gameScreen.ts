@@ -14,6 +14,8 @@ import {
 import { GameScene } from '../game/scene';
 import type { ClockView, ConnectionStatus, Session, SessionEvent, ShotPlayback } from '../session/types';
 import { sound } from '../audio/sound';
+import { helpButton } from './help';
+import { soundButtons } from './soundButtons';
 import { h } from './dom';
 
 export interface GameScreenHooks {
@@ -99,18 +101,13 @@ export class GameScreen {
     this.timeoutBtn = h('button.btn', { onclick: () => this.session.useTimeout(), title: '샷클락 연장' }, '연장');
     const skipBtn = h('button.btn', { onclick: () => this.scene.skipAnimation(), title: '공이 멈출 때까지 건너뛰기' }, '건너뛰기');
     this.replayBtn = h('button.btn', { onclick: () => void this.replayLast(), title: '직전 샷 다시 보기' }, '다시 보기');
-    const muteBtn = h('button.btn.ghost', { title: '소리' }, sound.muted ? '🔇' : '🔊');
-    muteBtn.addEventListener('click', () => {
-      sound.setMuted(!sound.muted);
-      muteBtn.textContent = sound.muted ? '🔇' : '🔊';
-    });
     const exitBtn = h('button.btn.ghost', { onclick: () => this.exit() }, '나가기');
-    this.bar.append(this.timeoutBtn, skipBtn, this.replayBtn, muteBtn);
+    this.bar.append(this.timeoutBtn, skipBtn, this.replayBtn, ...soundButtons());
     if (session.undo) {
       this.undoBtn = h('button.btn', { onclick: () => session.undo!(), title: '직전 샷 되돌리기' }, '되돌리기');
       this.bar.append(this.undoBtn, h('button.btn', { onclick: () => session.restart!() }, '처음부터'));
     }
-    this.bar.append(h('span.spacer'), h('span.help.muted', {}, '조준: 마우스 · 샷: 누른 채 당겼다 놓기 · 미세 조준: ←→ (Shift ×10) · 타점: W/A/S/D'), exitBtn);
+    this.bar.append(h('span.spacer'), helpButton('❓ 조작법'), exitBtn);
 
     const stage = this.scene.el.querySelector('.stage')!;
     stage.append(this.toastEl, this.bannerEl, this.disconnectEl);
