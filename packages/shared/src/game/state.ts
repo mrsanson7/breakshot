@@ -141,4 +141,6 @@ export interface MatchState {
   sets: SetRecord[];
   /** Seed for racks; rack n uses seed + n so every rack is reproducible. */
   seed: number;
+  /** Set when the match ended by forfeit (leave / disconnect claim): the seat that lost. */
+  forfeitBy?: Seat;
 }

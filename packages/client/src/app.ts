@@ -9,6 +9,7 @@ import { setupForm } from './ui/setupForm';
 import { OnlineSession, type OnlineIntent } from './session/online';
 import { joinForm, LobbyScreen } from './ui/lobbyScreen';
 import { LagScreen } from './ui/lagScreen';
+import { ReplayScreen } from './ui/replayScreen';
 
 /** Keep ?room=CODE in the address bar so a refresh resumes the game. */
 export function setRoomInUrl(code: string | null): void {
@@ -24,9 +25,13 @@ export class App {
 
   constructor(private readonly root: HTMLElement) {}
 
+  private replay: ReplayScreen | null = null;
+
   private mount(el: HTMLElement): void {
     this.game?.dispose();
     this.game = null;
+    this.replay?.dispose();
+    this.replay = null;
     clear(this.root);
     this.root.append(el);
   }
@@ -206,6 +211,12 @@ export class App {
           session.leave();
           setRoomInUrl(null);
           this.title();
+        },
+        replay: () => {
+          const replay = new ReplayScreen(session.settings, history, () => this.result(session, state, history));
+          this.mount(replay.el);
+          this.replay = replay;
+          replay.start();
         },
       }),
     );

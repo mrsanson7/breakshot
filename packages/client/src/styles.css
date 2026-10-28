@@ -148,3 +148,5 @@ button, select, input { font: inherit; color: inherit; }
 .code-input { font-family: var(--display); font-size: 32px !important; letter-spacing: .2em; text-transform: uppercase; text-align: center; }
 .lag-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .lag-info { flex: 1; color: var(--muted); font-size: 14px; }
+.replay-label { flex: 1; color: var(--muted); font-size: 14px; min-width: 160px; }
+.speed { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }

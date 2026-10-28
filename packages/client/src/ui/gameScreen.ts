@@ -63,6 +63,7 @@ export class GameScreen {
   private bar = h('div.game-bar');
   private undoBtn?: HTMLButtonElement;
   private timeoutBtn: HTMLButtonElement;
+  private replayBtn: HTMLButtonElement;
   private toastTimer = 0;
 
   constructor(
@@ -97,8 +98,14 @@ export class GameScreen {
 
     this.timeoutBtn = h('button.btn', { onclick: () => this.session.useTimeout(), title: '샷클락 연장' }, '연장');
     const skipBtn = h('button.btn', { onclick: () => this.scene.skipAnimation(), title: '공이 멈출 때까지 건너뛰기' }, '건너뛰기');
+    this.replayBtn = h('button.btn', { onclick: () => void this.replayLast(), title: '직전 샷 다시 보기' }, '다시 보기');
+    const muteBtn = h('button.btn.ghost', { title: '소리' }, sound.muted ? '🔇' : '🔊');
+    muteBtn.addEventListener('click', () => {
+      sound.setMuted(!sound.muted);
+      muteBtn.textContent = sound.muted ? '🔇' : '🔊';
+    });
     const exitBtn = h('button.btn.ghost', { onclick: () => this.exit() }, '나가기');
-    this.bar.append(this.timeoutBtn, skipBtn);
+    this.bar.append(this.timeoutBtn, skipBtn, this.replayBtn, muteBtn);
     if (session.undo) {
       this.undoBtn = h('button.btn', { onclick: () => session.undo!(), title: '직전 샷 되돌리기' }, '되돌리기');
       this.bar.append(this.undoBtn, h('button.btn', { onclick: () => session.restart!() }, '처음부터'));
@@ -172,6 +179,19 @@ export class GameScreen {
     this.applyTurn();
   }
 
+  /** Replay the previous shot, then restore the live table. */
+  private async replayLast(): Promise<void> {
+    const shot = this.history[this.history.length - 1];
+    if (!shot || this.busy) return;
+    this.busy = true;
+    this.scene.setTurn(null);
+    this.banner('다시 보기', 900);
+    await this.scene.playShot(shot.start, shot.cueBall, shot.input, shot.final, { onEvent: (e) => sound.event(e) });
+    this.scene.setBalls(this.state.balls);
+    this.busy = false;
+    void this.drain();
+  }
+
   private async playShot(shot: ShotPlayback): Promise<void> {
     this.history.push(shot);
     this.scene.setTurn(null);
@@ -183,6 +203,11 @@ export class GameScreen {
     await this.scene.playShot(shot.start, shot.cueBall, shot.input, shot.final, {
       onEvent: (ev: ShotEvent, sim) => {
         sound.event(ev);
+        if (ev.type === 'ballBall' && ev.speed > 1.5) {
+          const a = sim.ball(ev.a);
+          const b = sim.ball(ev.b);
+          this.scene.ring({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, 'rgba(255,255,255,0.55)', 0.3);
+        }
         if (!carom) return;
         if (ev.type === 'ballBall' && (ev.a === shot.cueBall || ev.b === shot.cueBall)) touched.add(ev.a === shot.cueBall ? ev.b : ev.a);
         if (ev.type === 'cushion' && ev.ball === shot.cueBall && touched.size < 2) {
@@ -231,6 +256,7 @@ export class GameScreen {
         : null,
     );
     this.timeoutBtn.disabled = !(live && mine && s.config.shotClock > 0 && s.players[s.current].timeoutsLeft > 0);
+    this.replayBtn.disabled = this.history.length === 0;
     if (this.undoBtn) this.undoBtn.disabled = !this.session.canUndo?.();
     this.renderHud();
   }

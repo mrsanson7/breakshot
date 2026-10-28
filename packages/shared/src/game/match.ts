@@ -280,6 +280,10 @@ export const cueBallFor = (state: MatchState, seat: Seat = state.current): strin
 export function forfeit(state: MatchState, loser: Seat): MatchState {
   const s = clone(state);
   s.winner = other(loser);
+  s.forfeitBy = loser;
+  s.ballInHand = null;
+  // Forfeit can happen in any phase (e.g. mid-animation on the server), so it bypasses the
+  // transition table on purpose.
   s.phase = 'GameOver';
   return s;
 }

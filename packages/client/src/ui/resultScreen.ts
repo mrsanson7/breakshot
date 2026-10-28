@@ -5,12 +5,13 @@ import { h } from './dom';
 export interface ResultActions {
   again(): void;
   home(): void;
+  replay(): void;
 }
 
 export function resultScreen(session: Session, state: MatchState, history: ShotPlayback[], actions: ResultActions): HTMLElement {
   const s = session.settings;
   const w = state.winner;
-  const headline = w === 'draw' ? '무승부' : w === null ? '경기 종료' : `${state.players[w].name} 승리!`;
+  const headline = w === 'draw' ? '무승부' : w === null ? '경기 종료' : `${state.players[w].name} ${state.forfeitBy !== undefined ? '몰수승' : '승리!'}`;
   const pool = state.ruleSet === 'wpa8';
   const rows = [0, 1].map((seat) => {
     const p = state.players[seat as 0 | 1];
@@ -38,7 +39,17 @@ export function resultScreen(session: Session, state: MatchState, history: ShotP
       state.sets.length > 1 ? h('div.sets', {}, state.sets.map((r, i) => h('span.set', {}, `${i + 1}세트 ${r.scores[0]}:${r.scores[1]}`))) : null,
       h('div.muted', {}, `총 ${history.length}샷`),
       h('div.menu.row', {},
-        h('button.btn.primary', { onclick: actions.again }, session.kind === 'practice' ? '다시 하기' : '재대결 요청'),
+        h('button.btn.primary', {
+          onclick: (e: Event) => {
+            actions.again();
+            if (session.kind === 'online') {
+              const b = e.currentTarget as HTMLButtonElement;
+              b.textContent = '상대 응답 대기 중…';
+              b.disabled = true;
+            }
+          },
+        }, session.kind === 'practice' ? '다시 하기' : '재대결 요청'),
+        history.length > 0 ? h('button.btn', { onclick: actions.replay }, '리플레이') : null,
         h('button.btn', { onclick: actions.home }, '타이틀로'),
       ),
     ),
