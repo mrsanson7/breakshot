@@ -19,6 +19,8 @@ export interface ClockView {
   /** Seconds the clock started from (for the gauge). */
   total: number;
   paused: boolean;
+  /** While paused: the frozen remaining time (ms). */
+  pausedRemaining?: number;
 }
 
 export type ConnectionStatus = 'local' | 'connected' | 'reconnecting' | 'offline';

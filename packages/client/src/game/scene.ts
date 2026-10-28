@@ -46,6 +46,8 @@ export interface PlayOptions {
   onEvent?: (e: ShotEvent, sim: Simulation) => void;
   /** Animation speed multiplier (replays). */
   speed?: number;
+  /** Balls drawn at rest next to the simulated ones (lag: the other player's ball). */
+  extraBalls?: BallPosition[];
 }
 
 export interface SceneCallbacks {
@@ -255,6 +257,7 @@ export class GameScene {
         x: this.prev[i].x + (b.x - this.prev[i].x) * a,
         y: this.prev[i].y + (b.y - this.prev[i].y) * a,
       }));
+      if (this.playing?.opts.extraBalls) balls.push(...this.playing.opts.extraBalls);
     } else {
       balls = this.balls;
     }

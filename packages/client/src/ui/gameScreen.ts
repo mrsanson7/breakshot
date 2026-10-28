@@ -297,7 +297,7 @@ export class GameScreen {
       this.hud.clockFill.style.width = '0%';
       return;
     }
-    const left = Math.max(0, (c.deadline - Date.now()) / 1000);
+    const left = Math.max(0, (c.paused && c.pausedRemaining !== undefined ? c.pausedRemaining : c.deadline - Date.now()) / 1000);
     this.hud.clock.textContent = c.paused ? `⏸ ${Math.ceil(left)}초` : `${Math.ceil(left)}초`;
     this.hud.clock.classList.toggle('low', left <= 10);
     this.hud.clockFill.style.width = `${Math.min(100, (left / Math.max(1, c.total)) * 100)}%`;
