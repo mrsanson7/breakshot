@@ -43,6 +43,26 @@ docker run -p 8787:8787 breakshot     # http://localhost:8787
 이미지 하나가 정적 파일과 WebSocket(`/ws`)을 같이 서빙하고 `/health` 로 헬스체크합니다.
 (작업 환경에 Docker 데몬이 없어 이미지 빌드는 직접 확인하지 못했습니다. 같은 번들을 Docker 없이 실행하는 것은 확인했습니다.)
 
+### 인터넷으로 친구와 하기
+
+**방법 1. Render에 올리기 (추천, 내 PC를 꺼도 됨)**
+
+1. https://render.com 에 GitHub 계정으로 가입합니다.
+2. **New → Blueprint** 를 누르고 이 저장소를 고른 뒤 **Apply** 를 누릅니다. 저장소의 `render.yaml` 이 무료 웹 서비스 하나를 만듭니다.
+3. 5~10분 뒤 생기는 `https://breakshot-xxxx.onrender.com` 주소를 친구에게 보내면 됩니다. 이후 `main` 에 푸시하면 자동으로 다시 배포됩니다.
+
+무료 요금제는 15분 동안 아무도 접속하지 않으면 잠들고, 다음 접속 때 깨어나는 데 1분 정도 걸립니다. 서버가 잠들거나 다시 배포되면 진행 중인 방은 사라집니다.
+
+**방법 2. 내 PC에서 임시 주소 만들기 (PC를 켜 둔 동안만)**
+
+```bash
+pnpm serve                                        # 빌드 후 :8787 하나로 게임 전체를 서빙
+cloudflared tunnel --url http://localhost:8787    # 다른 터미널에서. https://….trycloudflare.com 주소가 나옴
+```
+
+`cloudflared` 는 https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/ 에서 설치합니다. 주소는 실행할 때마다 바뀝니다.
+`pnpm dev`(5173) 대신 `pnpm serve` 를 쓰는 이유는 화면과 서버가 한 포트에 있어야 터널 하나로 다 통하기 때문입니다.
+
 ### 환경 변수 (`.env.example` 참고)
 
 | 변수 | 기본값 | 설명 |

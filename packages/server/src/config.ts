@@ -11,12 +11,14 @@ export interface ServerConfig {
   sweepIntervalMs: number;
 }
 
-export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
+export function loadConfig(env: NodeJS.ProcessEnv = process.env, argv: string[] = process.argv.slice(2)): ServerConfig {
+  // `--static <dir>` lets `pnpm serve` serve the built client without setting env vars (works on Windows too).
+  const staticArg = argv.indexOf('--static');
   const num = (v: string | undefined, d: number) => (v && Number.isFinite(Number(v)) ? Number(v) : d);
   return {
     port: num(env.PORT ?? env.SERVER_PORT, 8787),
     host: env.HOST ?? '0.0.0.0',
-    staticDir: env.STATIC_DIR ?? '',
+    staticDir: env.STATIC_DIR ?? (staticArg >= 0 ? (argv[staticArg + 1] ?? '') : ''),
     allowedOrigins: (env.ALLOWED_ORIGINS ?? '')
       .split(',')
       .map((s) => s.trim())

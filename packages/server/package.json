@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "esbuild src/index.ts --bundle --platform=node --target=node20 --format=esm --outfile=dist/index.js --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\"",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "serve": "node dist/index.js --static ../client/dist"
   },
   "dependencies": {
     "@breakshot/shared": "workspace:*",

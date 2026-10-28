@@ -8,6 +8,7 @@
     "dev": "pnpm --parallel --filter @breakshot/server --filter @breakshot/client run dev",
     "build": "pnpm --filter @breakshot/client run build && pnpm --filter @breakshot/server run build",
     "start": "pnpm --filter @breakshot/server run start",
+    "serve": "pnpm build && pnpm --filter @breakshot/server run serve",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -p packages/shared && tsc -p packages/client && tsc -p packages/server"
