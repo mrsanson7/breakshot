@@ -22,7 +22,7 @@ breakshot/
    │  ├─ src/aim/          # 조준 보조선 예측(레이캐스트)
    │  ├─ src/net/          # 메시지 타입 + zod 스키마
    │  └─ test/
-   ├─ client/              # Vite + Canvas 2D
+   ├─ client/              # Vite + three.js (처음엔 Canvas 2D, 이후 3D로 교체)
    │  └─ src/  render/ input/ ui/(화면들) session/(연습·온라인) net/ audio/
    └─ server/              # Node + ws
       └─ src/  index.ts rooms/(Room, RoomManager) clock.ts  + test/

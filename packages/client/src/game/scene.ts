@@ -19,7 +19,8 @@ import {
   type Vec2,
 } from '@breakshot/shared';
 import { AimController, type AimState } from '../input/aimController';
-import { TableRenderer, type FloatingText, type RenderFrame } from '../render/renderer';
+import { Renderer3D } from '../render3d/renderer3d';
+import type { CameraMode, FloatingText, RenderFrame } from '../render3d/types';
 import { h } from '../ui/dom';
 import { PowerBar } from '../ui/powerBar';
 import { SpinWidget } from '../ui/spinWidget';
@@ -65,7 +66,8 @@ export class GameScene {
   readonly canvas: HTMLCanvasElement;
   readonly spin: SpinWidget;
   readonly power: PowerBar;
-  private renderer: TableRenderer;
+  private renderer: Renderer3D;
+  private cameraBtn: HTMLButtonElement;
   private loop: FixedLoop;
   private aim: AimController;
   private geom: TableGeometry;
@@ -89,19 +91,21 @@ export class GameScene {
     this.discipline = discipline;
     this.geom = buildTableGeometry(TABLES[tableId]);
     this.canvas = h('canvas.table-canvas');
-    this.renderer = new TableRenderer(this.canvas, this.geom, DISCIPLINES[discipline].balls);
+    const phys = PHYSICS[DISCIPLINES[discipline].physics];
+    this.renderer = new Renderer3D(this.canvas, this.geom, DISCIPLINES[discipline].balls, phys.maxTipOffset);
     this.spin = new SpinWidget((x, y) => this.aim.setSpin(x, y));
     this.power = new PowerBar({
       onDrag: (p) => this.aim.setPower(p),
       onRelease: (p) => this.aim.shootWithPower(p),
     });
     const fine = h('div.fine-aim', {}, this.repeatButton('⟲', () => this.aim.nudge(CONTROLS.fineAimStepDeg)), this.repeatButton('⟳', () => this.aim.nudge(-CONTROLS.fineAimStepDeg)));
-    this.el = h('div.scene', {}, h('div.stage', {}, this.canvas), h('div.scene-controls', {}, this.spin.el, fine, this.power.el));
-    this.aim = new AimController(this.canvas, this.renderer.view, {
+    this.cameraBtn = h('button.btn.fine.camera', { title: '시점 바꾸기 (위 / 큐 뒤)', onclick: () => this.setCameraMode(this.renderer.cameraMode === 'cue' ? 'top' : 'cue') });
+    this.el = h('div.scene', {}, h('div.stage', {}, this.canvas, this.renderer.overlay), h('div.scene-controls', {}, this.cameraBtn, this.spin.el, fine, this.power.el));
+    this.aim = new AimController(this.canvas, this.renderer, {
       onChange: (s) => this.onAimChange(s),
       onShoot: (s) => this.onShoot(s),
     });
-    const phys = PHYSICS[DISCIPLINES[discipline].physics];
+    this.setCameraMode(loadCameraMode());
     this.loop = new FixedLoop(phys.timeStep, () => this.update(), (alpha, dt) => this.render(alpha, dt));
     this.resizeObserver = new ResizeObserver(() => this.renderer.resize());
     this.resizeObserver.observe(this.canvas);
@@ -130,6 +134,18 @@ export class GameScene {
     return b;
   }
 
+  /** 위 시점(top) or 큐 뒤 시점(cue). In cue view the aim turns by dragging sideways. */
+  setCameraMode(mode: CameraMode): void {
+    this.renderer.cameraMode = mode;
+    this.aim.rotateMode = mode === 'cue';
+    this.cameraBtn.textContent = mode === 'cue' ? '🎥 큐' : '🗺️ 위';
+    try {
+      localStorage.setItem(CAMERA_KEY, mode);
+    } catch {
+      // storage unavailable
+    }
+  }
+
   get geometry(): TableGeometry {
     return this.geom;
   }
@@ -147,10 +163,11 @@ export class GameScene {
     this.loop.stop();
     this.aim.dispose();
     this.resizeObserver.disconnect();
+    this.renderer.dispose();
   }
 
   setFelt(color: string | null): void {
-    this.renderer.palette.felt = color ?? this.geom.spec.colors.felt;
+    this.renderer.setFelt(color);
   }
 
   setBalls(balls: readonly BallPosition[]): void {
@@ -259,6 +276,7 @@ export class GameScene {
       p.carry -= 1;
       this.prev = sim.balls.map((b) => ({ x: b.x, y: b.y }));
       const moving = sim.step();
+      this.renderer.spinBalls(sim.balls, sim.phys.timeStep);
       this.flushEvents();
       if (!moving) {
         this.finishPlaying();
@@ -287,7 +305,7 @@ export class GameScene {
       balls = this.balls;
     }
 
-    const frame: RenderFrame = { balls, texts: this.texts, rings: this.rings };
+    const frame: RenderFrame = { balls, texts: this.texts, rings: this.rings, animating: !!this.sim, holdCamera: this.aim.isPlacing };
     if (this.turn) frame.highlight = this.turn.cueBall;
     if (!this.sim && this.turn) {
       if (this.turn.interactive && this.aimState) {
@@ -297,7 +315,7 @@ export class GameScene {
           frame.placement = { at: this.aimState.placing, valid: this.aimState.placementValid };
         }
         if (cuePos) {
-          frame.cue = { at: cuePos, angle: this.aimState.angle, pull: this.aimState.power };
+          frame.cue = { at: cuePos, angle: this.aimState.angle, pull: this.aimState.power, spinX: this.aimState.spinX, spinY: this.aimState.spinY };
           frame.aim = this.prediction;
         }
       } else if (!this.turn.interactive && this.remote) {
@@ -306,7 +324,7 @@ export class GameScene {
           if (this.remote.cueBallPos) {
             frame.balls = balls.map((b) => (b.id === this.turn!.cueBall ? { ...b, x: cue.x, y: cue.y, pocketed: false } : b));
           }
-          frame.cue = { at: { x: cue.x, y: cue.y }, angle: this.remote.angle, pull: this.remote.power, ghost: true };
+          frame.cue = { at: { x: cue.x, y: cue.y }, angle: this.remote.angle, pull: this.remote.power, spinX: this.remote.spinX, spinY: this.remote.spinY, ghost: true };
         }
       }
     }
@@ -360,5 +378,15 @@ export class GameScene {
       input: { angle: s.angle, power: s.power, spinX: s.spinX, spinY: s.spinY },
       cueBallPos: s.placing ?? undefined,
     });
+  }
+}
+
+const CAMERA_KEY = 'breakshot.camera';
+
+function loadCameraMode(): CameraMode {
+  try {
+    return localStorage.getItem(CAMERA_KEY) === 'top' ? 'top' : 'cue';
+  } catch {
+    return 'cue';
   }
 }

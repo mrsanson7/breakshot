@@ -9,6 +9,8 @@ export const CONTROLS = {
   minShotPower: 0.03,
   /** Spin keys (W/A/S/D) step, as a fraction of the maximum tip offset. */
   spinKeyStep: 0.1,
+  /** Behind-the-cue camera: aim turn per CSS pixel of sideways drag (deg). */
+  dragAimDegPerPx: 0.15,
   /** Pressing within this many radii of the cue ball during ball-in-hand picks it up. */
   pickRadiusFactor: 2.2,
 } as const;
@@ -40,4 +42,44 @@ export const MUSIC = {
   lookaheadSeconds: 1.5,
   schedulerIntervalMs: 250,
   fadeSeconds: 1.5,
+} as const;
+
+/** 3D view (three.js). Lengths in metres, angles in degrees. */
+export const RENDER3D = {
+  /** Cap on device pixel ratio (phones report 3; 2 looks the same and costs less). */
+  maxPixelRatio: 2,
+  shadowMapSize: 1024,
+  fovDeg: 38,
+  /** Extra room around the table in the top view (fraction). */
+  topViewMargin: 0.04,
+  /** Use the upright (portrait) top view when it makes the table this much bigger. */
+  portraitGain: 1.15,
+  /** Camera behind the cue ball while aiming. */
+  cueView: { distance: 0.95, height: 0.42, lookAhead: 0.7 },
+  /** While balls roll in cue view the camera rises to look over the whole table. */
+  overview: { height: 3.1, back: 1.7 },
+  /** Camera easing rate (1/s): higher = snappier. */
+  cameraFollowRate: 6,
+  cue: {
+    length: 1.45,
+    /** Tip to ball distance at zero power. */
+    gap: 0.015,
+    /** Back-swing at full power. */
+    maxPull: 0.3,
+    tipRadius: 0.0065,
+    buttRadius: 0.0145,
+    /** Minimum butt elevation; raised further when needed to clear the rail. */
+    minElevationDeg: 4,
+    railClearance: 0.02,
+  },
+  ballSegments: { width: 40, height: 28 },
+  ballTexturePx: 512,
+  /** Carom balls get small dots so their spin is visible (like TV/measle balls). */
+  caromDotDeg: 9,
+  aimLine: { width: 0.0035, dash: 0.02, gap: 0.014, lift: 0.0008 },
+  /** Rail top above the cushion top. */
+  railRise: 0.004,
+  /** Wooden apron below the bed. */
+  skirtDepth: 0.2,
+  ringPool: 16,
 } as const;

@@ -1,6 +1,6 @@
 import { clampPlacement, isValidPlacement, type BallPosition, type PlacementRegion, type TableGeometry, type Vec2 } from '@breakshot/shared';
 import { CONTROLS } from '../config';
-import type { View } from '../render/view';
+import type { ScreenMapper } from '../render3d/types';
 
 export interface AimState {
   angle: number;
@@ -34,6 +34,7 @@ const DEG = Math.PI / 180;
  * Mouse / pointer and keyboard aiming:
  *  - move: aim at the pointer
  *  - press and pull back, release: shoot (power ∝ pull distance)
+ *  - rotate mode (camera behind the cue): drag sideways to turn; shoot with the power bar
  *  - ball in hand: press on the cue ball and drag to place it
  *  - arrow keys: fine aim (0.1°, Shift = 1°); W/A/S/D: spin; Esc / right click: cancel
  */
@@ -45,10 +46,14 @@ export class AimController {
   private dragPointer: number | null = null;
   /** Touch / pen: the pointer currently aiming (power comes from the on-screen slider). */
   private touchAim: number | null = null;
+  /** Rotate mode: the pointer turning the aim and its last x (CSS px). */
+  private turning: { pointer: number; x: number } | null = null;
+  /** Drag sideways to turn instead of pointing at the target (behind-the-cue camera). */
+  rotateMode = false;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
-    private readonly view: View,
+    private readonly view: ScreenMapper,
     private readonly cb: AimCallbacks,
   ) {
     canvas.addEventListener('pointermove', this.onMove);
@@ -94,6 +99,11 @@ export class AimController {
     this.pull = null;
     this.state.power = 0;
     this.canvas.style.cursor = 'default';
+  }
+
+  /** The player is dragging the cue ball (ball in hand). */
+  get isPlacing(): boolean {
+    return this.dragPointer !== null;
   }
 
   get isEnabled(): boolean {
@@ -171,6 +181,13 @@ export class AimController {
       this.emit();
       return;
     }
+    if (this.turning && this.turning.pointer === e.pointerId) {
+      this.state.angle -= (e.clientX - this.turning.x) * CONTROLS.dragAimDegPerPx * DEG;
+      this.turning.x = e.clientX;
+      this.emit();
+      return;
+    }
+    if (this.rotateMode) return;
     if (e.pointerType === 'mouse' || this.touchAim === e.pointerId) this.aimAt(w);
   };
 
@@ -193,6 +210,10 @@ export class AimController {
     if (this.state.placing && cue && Math.hypot(w.x - cue.x, w.y - cue.y) < R * CONTROLS.pickRadiusFactor) {
       this.dragPointer = e.pointerId;
       this.canvas.style.cursor = 'grabbing';
+      return;
+    }
+    if (this.rotateMode) {
+      this.turning = { pointer: e.pointerId, x: e.clientX };
       return;
     }
     if (e.pointerType !== 'mouse') {
@@ -218,6 +239,10 @@ export class AimController {
       this.touchAim = null;
       return;
     }
+    if (this.turning?.pointer === e.pointerId) {
+      this.turning = null;
+      return;
+    }
     if (!this.pull || this.pull.pointer !== e.pointerId) return;
     this.pull = null;
     if (!this.enabled) return;
@@ -239,6 +264,7 @@ export class AimController {
     this.pull = null;
     this.dragPointer = null;
     this.touchAim = null;
+    this.turning = null;
     if (this.state.power !== 0) {
       this.state.power = 0;
       this.emit();
