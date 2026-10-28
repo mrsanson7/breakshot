@@ -11,3 +11,4 @@ export * from './physics/simulation';
 export * from './game/layouts';
 export * from './config/aim';
 export * from './aim/predict';
+export * from './game/placement';

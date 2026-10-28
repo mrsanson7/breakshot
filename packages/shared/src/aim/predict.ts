@@ -91,8 +91,13 @@ export function predictAim(
       const tx = d.x - cosCut * nx;
       const ty = d.y - cosCut * ny;
       const tl = Math.hypot(tx, ty);
-      const objLen = assist.objectLineLength * (0.25 + 0.75 * cosCut);
-      const defLen = assist.deflectLineLength * (0.25 + 0.75 * tl);
+      // Lines stop at the first cushion or ball in their way.
+      const limit = (from: Vec2, dir: Vec2, skip: string, want: number) => {
+        const stop = castRay(geom, balls, skip, from, dir, R);
+        return stop ? Math.min(want, stop.t) : want;
+      };
+      const objLen = limit(b, { x: nx, y: ny }, b.id, assist.objectLineLength * (0.25 + 0.75 * cosCut));
+      const defLen = tl > 1e-6 ? limit(at, { x: tx / tl, y: ty / tl }, cueBall, assist.deflectLineLength * (0.25 + 0.75 * tl)) : 0;
       return {
         cuePath: path,
         ghost: at,

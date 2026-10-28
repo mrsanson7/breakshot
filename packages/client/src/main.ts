@@ -1,99 +1,48 @@
 import './styles.css';
-import {
-  buildTableGeometry,
-  createRng,
-  DISCIPLINES,
-  eightBallRack,
-  PHYSICS,
-  Simulation,
-  TABLES,
-  threeCushionBreak,
-  fourBallBreak,
-  type DisciplineId,
-  type BallPosition,
-} from '@breakshot/shared';
-import { TableRenderer } from './render/renderer';
-import { FixedLoop } from './game/loop';
+import { createRng, DISCIPLINES, eightBallRack, fourBallBreak, PHYSICS, TABLES, threeCushionBreak, type BallPosition, type DisciplineId, type TableId, type AimAssistLevel } from '@breakshot/shared';
+import { GameScene } from './game/scene';
+import { h } from './ui/dom';
 
-// Milestone 1 viewer: the three tables, their layouts and the fixed-step loop.
+// Milestone 3 sandbox: aim, pull-back power, guide lines and tip offset on every table.
 const app = document.getElementById('app')!;
-app.innerHTML = `
-  <div class="m1">
-    <header class="m1-bar">
-      <strong>Break Shot · M1</strong>
-      <span class="tabs"></span>
-      <button id="shot">랜덤 샷</button>
-      <span id="stats" class="muted"></span>
-    </header>
-    <div class="stage"><canvas id="table"></canvas></div>
-  </div>`;
-const tabs = app.querySelector('.tabs')!;
-const canvas = app.querySelector<HTMLCanvasElement>('#table')!;
-const stats = app.querySelector<HTMLSpanElement>('#stats')!;
-
-let discipline: DisciplineId = 'threeCushion';
-let tableId = DISCIPLINES[discipline].defaultTable;
-let geom = buildTableGeometry(TABLES[tableId]);
-const renderer = new TableRenderer(canvas, geom, DISCIPLINES[discipline].balls);
-let sim = new Simulation(geom, PHYSICS.carom, layout());
-let prev = sim.balls.map((b) => ({ ...b }));
 const rng = createRng(Date.now() & 0xffff);
+let scene: GameScene | null = null;
+let assist: AimAssistLevel = 'full';
+const bar = h('header.m1-bar');
+const holder = h('div.sandbox');
+app.append(h('div.m1', {}, bar, holder));
 
-function layout(): BallPosition[] {
-  const spec = TABLES[tableId];
-  if (discipline === 'eightBall') return eightBallRack(spec, rng ?? Math.random, PHYSICS.pool.rackGap);
-  if (discipline === 'threeCushion') return threeCushionBreak(spec, 'white', 'yellow', 1);
-  return fourBallBreak(spec, 'white', 'yellow', 1);
+function layout(d: DisciplineId, t: TableId): BallPosition[] {
+  if (d === 'eightBall') return eightBallRack(TABLES[t], rng, PHYSICS.pool.rackGap);
+  if (d === 'threeCushion') return threeCushionBreak(TABLES[t], 'white', 'yellow', 1);
+  return fourBallBreak(TABLES[t], 'white', 'yellow', 1);
 }
 
-function select(d: DisciplineId, t = DISCIPLINES[d].defaultTable) {
-  discipline = d;
-  tableId = t;
-  geom = buildTableGeometry(TABLES[t]);
-  renderer.setTable(geom, DISCIPLINES[d].balls);
-  sim = new Simulation(geom, PHYSICS[DISCIPLINES[d].physics], layout());
-  prev = sim.balls.map((b) => ({ ...b }));
-  renderTabs();
+function open(d: DisciplineId, t: TableId) {
+  scene?.dispose();
+  holder.innerHTML = '';
+  const cueBall = d === 'eightBall' ? 'cue' : 'white';
+  const s: GameScene = new GameScene(t, d, {
+    onShoot: async (req) => {
+      await s.playShot(s.getBalls(), cueBall, req.input, null);
+      const cue = s.getBalls().find((b) => b.id === cueBall)!;
+      s.setTurn({ interactive: true, cueBall, ballInHand: cue.pocketed ? 'anywhere' : null, assist });
+    },
+  });
+  scene = s;
+  holder.append(s.el);
+  s.setBalls(layout(d, t));
+  s.setTurn({ interactive: true, cueBall, ballInHand: d === 'eightBall' ? 'kitchen' : null, assist });
+  s.start();
+  bar.innerHTML = '';
+  bar.append(h('strong', {}, 'Break Shot · M3'));
+  for (const dd of Object.values(DISCIPLINES))
+    for (const tt of dd.tables)
+      bar.append(h('button', { className: dd.id === d && tt === t ? 'on' : '', onclick: () => open(dd.id, tt) }, dd.tables.length > 1 ? `${dd.name} · ${TABLES[tt].name}` : dd.name));
+  const sel = h('select', { onchange: (e: Event) => { assist = (e.target as HTMLSelectElement).value as AimAssistLevel; open(d, t); } },
+    h('option', { value: 'full', selected: assist === 'full' }, '보조선: 길게'),
+    h('option', { value: 'short', selected: assist === 'short' }, '보조선: 짧게 (경쟁전)'),
+    h('option', { value: 'off', selected: assist === 'off' }, '보조선: 끄기'));
+  bar.append(sel, h('span.muted', {}, '마우스로 조준 · 누른 채 뒤로 당겼다 놓기 · 방향키 0.1° (Shift 1°) · W/A/S/D 타점'));
 }
-
-function renderTabs() {
-  tabs.innerHTML = '';
-  for (const d of Object.values(DISCIPLINES)) {
-    for (const t of d.tables) {
-      const b = document.createElement('button');
-      b.textContent = d.tables.length > 1 ? `${d.name} · ${TABLES[t].name}` : d.name;
-      b.className = d.id === discipline && t === tableId ? 'on' : '';
-      b.onclick = () => select(d.id, t);
-      tabs.appendChild(b);
-    }
-  }
-}
-
-app.querySelector<HTMLButtonElement>('#shot')!.onclick = () => {
-  const cue = discipline === 'eightBall' ? 'cue' : 'white';
-  sim = new Simulation(geom, sim.phys, sim.balls.some((b) => b.pocketed && b.id === cue) ? layout() : sim.balls.map((b) => ({ ...b, vx: 0, vy: 0, wx: 0, wy: 0, wz: 0 })));
-  sim.strike(cue, { angle: rng() * Math.PI * 2, power: 0.4 + rng() * 0.6, spinX: rng() - 0.5, spinY: rng() - 0.5 });
-};
-
-const loop = new FixedLoop(
-  PHYSICS.carom.timeStep,
-  () => {
-    prev = sim.balls.map((b) => ({ ...b }));
-    if (sim.isMoving()) sim.step();
-  },
-  (alpha) => {
-    const balls = sim.balls.map((b, i) => ({
-      id: b.id,
-      pocketed: b.pocketed,
-      x: prev[i].x + (b.x - prev[i].x) * alpha,
-      y: prev[i].y + (b.y - prev[i].y) * alpha,
-    }));
-    renderer.draw({ balls });
-    stats.textContent = `${Math.round(loop.fps)} fps · 물리 ${loop.stepsLastFrame}스텝/프레임 · t=${sim.time.toFixed(2)}s`;
-  },
-);
-
-new ResizeObserver(() => renderer.resize()).observe(canvas);
-renderTabs();
-renderer.resize();
-loop.start();
+open('threeCushion', 'caromLarge');
