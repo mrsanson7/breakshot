@@ -13,6 +13,7 @@ import {
   type PlacementRegion,
   type ShotEvent,
   type ShotInput,
+  type ShotRequest,
   type TableGeometry,
   type TableId,
   type Vec2,
@@ -23,12 +24,6 @@ import { h } from '../ui/dom';
 import { PowerBar } from '../ui/powerBar';
 import { SpinWidget } from '../ui/spinWidget';
 import { FixedLoop } from './loop';
-
-export interface ShotRequest {
-  input: ShotInput;
-  /** Ball-in-hand placement chosen by the shooter. */
-  cueBallPos?: Vec2;
-}
 
 /** Aim shown for the other player (online) — what the opponent is doing right now. */
 export interface RemoteAim {
