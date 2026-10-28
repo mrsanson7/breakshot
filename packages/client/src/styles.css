@@ -97,7 +97,9 @@ button, select, input { font: inherit; color: inherit; }
 .spin-label, .power-title, .power-label { font-size: 12px; color: var(--muted); }
 .power { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; min-height: 120px; max-height: 340px; width: 100%; }
 .power-track { flex: 1; width: 30px; border-radius: 15px; background: var(--panel); border: 1px solid var(--line); position: relative; overflow: hidden; touch-action: none; cursor: ns-resize; }
-.power-fill { position: absolute; left: 0; right: 0; top: 0; height: 0; background: linear-gradient(180deg, #46d17d, #f2c22e 60%, #ff5468); }
+.power-fill { position: absolute; left: 0; right: 0; top: 0; height: var(--power, 0%); background: linear-gradient(180deg, #46d17d, #f2c22e 60%, #ff5468); }
+.fine-aim { display: flex; gap: 6px; }
+.btn.fine { padding: 6px 10px; touch-action: none; user-select: none; -webkit-user-select: none; }
 .power-label { font-variant-numeric: tabular-nums; }
 
 /* Overlays on the table */
@@ -150,3 +152,19 @@ button, select, input { font: inherit; color: inherit; }
 .lag-info { flex: 1; color: var(--muted); font-size: 14px; }
 .replay-label { flex: 1; color: var(--muted); font-size: 14px; min-width: 160px; }
 .speed { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+
+/* Narrow / portrait screens and touch: controls move under the table, power bar turns horizontal. */
+@media (max-width: 760px), (orientation: portrait) and (max-width: 1024px) {
+  .scene { flex-direction: column; gap: 8px; }
+  .scene-controls { flex-direction: row; width: 100%; padding-top: 0; gap: 10px; align-items: center; }
+  .spin-canvas { width: 64px; height: 64px; }
+  .spin-label { display: none; }
+  .power { flex-direction: row; flex: 1; min-height: 0; max-height: none; height: 48px; }
+  .power-track { height: 40px; width: auto; flex: 1; cursor: ew-resize; }
+  .power-fill { top: 0; bottom: 0; left: 0; right: auto; height: auto; width: var(--power, 0%); background: linear-gradient(90deg, #46d17d, #f2c22e 60%, #ff5468); }
+  .game { padding: 6px 10px; gap: 6px; }
+  .game-bar .btn { padding: 6px 10px; font-size: 14px; }
+}
+@media (hover: hover) and (pointer: fine) and (min-width: 761px) {
+  .fine-aim { display: none; }
+}

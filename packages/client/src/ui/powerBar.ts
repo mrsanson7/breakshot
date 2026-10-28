@@ -37,13 +37,16 @@ export class PowerBar {
 
   set(power: number): void {
     this.value = power;
-    this.fill.style.height = `${Math.round(power * 100)}%`;
+    this.fill.style.setProperty('--power', `${Math.round(power * 100)}%`);
     this.label.textContent = `${Math.round(power * 100)}%`;
   }
 
   private fromPointer(track: HTMLElement, e: PointerEvent): void {
     const r = track.getBoundingClientRect();
-    const p = Math.max(0, Math.min(1, (e.clientY - r.top) / r.height));
+    // Vertical bar on desktop (drag down), horizontal bar on narrow screens (drag right).
+    const horizontal = r.width > r.height;
+    const f = horizontal ? (e.clientX - r.left) / r.width : (e.clientY - r.top) / r.height;
+    const p = Math.max(0, Math.min(1, f));
     this.set(p);
     this.handlers.onDrag(p);
   }

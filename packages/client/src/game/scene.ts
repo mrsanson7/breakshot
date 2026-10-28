@@ -24,6 +24,7 @@ import { h } from '../ui/dom';
 import { PowerBar } from '../ui/powerBar';
 import { SpinWidget } from '../ui/spinWidget';
 import { FixedLoop } from './loop';
+import { CONTROLS } from '../config';
 
 /** Aim shown for the other player (online) — what the opponent is doing right now. */
 export interface RemoteAim {
@@ -94,7 +95,8 @@ export class GameScene {
       onDrag: (p) => this.aim.setPower(p),
       onRelease: (p) => this.aim.shootWithPower(p),
     });
-    this.el = h('div.scene', {}, h('div.stage', {}, this.canvas), h('div.scene-controls', {}, this.spin.el, this.power.el));
+    const fine = h('div.fine-aim', {}, this.repeatButton('⟲', () => this.aim.nudge(CONTROLS.fineAimStepDeg)), this.repeatButton('⟳', () => this.aim.nudge(-CONTROLS.fineAimStepDeg)));
+    this.el = h('div.scene', {}, h('div.stage', {}, this.canvas), h('div.scene-controls', {}, this.spin.el, fine, this.power.el));
     this.aim = new AimController(this.canvas, this.renderer.view, {
       onChange: (s) => this.onAimChange(s),
       onShoot: (s) => this.onShoot(s),
@@ -103,6 +105,29 @@ export class GameScene {
     this.loop = new FixedLoop(phys.timeStep, () => this.update(), (alpha, dt) => this.render(alpha, dt));
     this.resizeObserver = new ResizeObserver(() => this.renderer.resize());
     this.resizeObserver.observe(this.canvas);
+  }
+
+  /** Button that repeats while held (touch-friendly fine aim, 0.1° per tick). */
+  private repeatButton(label: string, fn: () => void): HTMLButtonElement {
+    const b = h('button.btn.fine', { title: '미세 조준 0.1°' }, label);
+    let timer = 0;
+    let delay = 0;
+    const stop = () => window.clearTimeout(timer);
+    const tick = () => {
+      fn();
+      delay = Math.max(30, delay * 0.85);
+      timer = window.setTimeout(tick, delay);
+    };
+    b.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      b.setPointerCapture(e.pointerId);
+      fn();
+      delay = 300;
+      timer = window.setTimeout(tick, delay);
+    });
+    b.addEventListener('pointerup', stop);
+    b.addEventListener('pointercancel', stop);
+    return b;
   }
 
   get geometry(): TableGeometry {

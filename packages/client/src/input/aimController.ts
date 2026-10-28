@@ -112,6 +112,13 @@ export class AimController {
     this.emit();
   }
 
+  /** Rotate the aim by `deg` (on-screen fine-aim buttons). */
+  nudge(deg: number): void {
+    if (!this.enabled) return;
+    this.state.angle += deg * DEG;
+    this.emit();
+  }
+
   /** Shoot with the current aim at the given power (used by the touch power slider). */
   shootWithPower(power: number): void {
     if (!this.enabled || (this.state.placing && !this.state.placementValid)) return;
