@@ -18,6 +18,8 @@ export interface PracticeOptions {
   /** Free practice: the turn always comes back to seat 0. */
   freePlay: boolean;
   names: [string, string];
+  /** Who breaks first: a seat, or 'random'. */
+  firstBreaker?: 0 | 1 | 'random';
 }
 
 /** Offline practice: runs the shared match engine locally; both seats are local. */
@@ -46,7 +48,7 @@ export class PracticeSession implements Session {
       config: this.settings.config,
       names: this.opts.names,
       seed,
-      firstBreaker: 0,
+      firstBreaker: this.opts.firstBreaker === 'random' ? (Math.random() < 0.5 ? 0 : 1) : (this.opts.firstBreaker ?? 0),
     });
     return startMatch(m);
   }

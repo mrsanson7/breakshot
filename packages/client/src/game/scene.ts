@@ -20,13 +20,14 @@ import {
 } from '@breakshot/shared';
 import { AimController, type AimState } from '../input/aimController';
 import { Renderer3D } from '../render3d/renderer3d';
-import type { CameraMode, FloatingText, RenderFrame } from '../render3d/types';
+import type { CameraMode, FloatingText, GuideOverlay, RenderFrame, ShotView } from '../render3d/types';
+import { cueTrajectory, fiveAndHalf } from './systems';
 import { h } from '../ui/dom';
 import { PowerBar } from '../ui/powerBar';
 import { SpinWidget } from '../ui/spinWidget';
 import { ElevationWidget } from '../ui/elevationWidget';
 import { FixedLoop } from './loop';
-import { CONTROLS } from '../config';
+import { CONTROLS, GUIDE } from '../config';
 
 /** Aim shown for the other player (online) — what the opponent is doing right now. */
 export interface RemoteAim {
@@ -71,6 +72,17 @@ export class GameScene {
   readonly power: PowerBar;
   private renderer: Renderer3D;
   private cameraBtn: HTMLButtonElement;
+  private shotViewBtn: HTMLButtonElement;
+  private pathBtn: HTMLButtonElement;
+  private systemBtn: HTMLButtonElement;
+  private systemPanel: HTMLDivElement;
+  /** Practice guide switches (off in online games). */
+  private guideAllowed = false;
+  private showPath = false;
+  private showSystem = false;
+  private guide: GuideOverlay | undefined;
+  private guideQueued = false;
+  private lastPower: number = GUIDE.previewPower;
   private loop: FixedLoop;
   private aim: AimController;
   private geom: TableGeometry;
@@ -104,13 +116,18 @@ export class GameScene {
     });
     const fine = h('div.fine-aim', {}, this.repeatButton('⟲', () => this.aim.nudge(CONTROLS.fineAimStepDeg)), this.repeatButton('⟳', () => this.aim.nudge(-CONTROLS.fineAimStepDeg)));
     this.cameraBtn = h('button.btn.fine.camera', { title: '시점 바꾸기 (위 / 큐 뒤)', onclick: () => this.setCameraMode(this.renderer.cameraMode === 'cue' ? 'top' : 'cue') });
-    this.el = h('div.scene', {}, h('div.stage', {}, this.canvas, this.renderer.overlay, this.cameraBtn), h('div.scene-controls', {}, this.spin.el, this.elevation.el, fine, this.power.el));
+    this.shotViewBtn = h('button.btn.fine.camera', { title: '공이 굴러갈 때 시점 (위 / 비스듬히)', onclick: () => this.setShotView(this.renderer.shotView === 'top' ? 'angled' : 'top') });
+    this.pathBtn = h('button.btn.fine.camera', { hidden: true, title: '실제로 굴러갈 길 보기 (연습 모드)', onclick: () => this.toggleGuide('path') }, '〰️ 궤적');
+    this.systemBtn = h('button.btn.fine.camera', { hidden: true, title: '파이브앤하프 시스템 보기 (연습 모드)', onclick: () => this.toggleGuide('system') }, '📐 시스템');
+    this.systemPanel = h('div.system-panel', { hidden: true });
+    this.el = h('div.scene', {}, h('div.stage', {}, this.canvas, this.renderer.overlay, h('div.view-buttons', {}, this.cameraBtn, this.shotViewBtn, this.pathBtn, this.systemBtn), this.systemPanel), h('div.scene-controls', {}, this.spin.el, this.elevation.el, fine, this.power.el));
     this.aim = new AimController(this.canvas, this.renderer, {
       onChange: (s) => this.onAimChange(s),
       onShoot: (s) => this.onShoot(s),
     });
     this.aim.maxElevation = phys.maxCueElevationDeg;
     this.setCameraMode(loadCameraMode());
+    this.setShotView(loadShotView());
     this.loop = new FixedLoop(phys.timeStep, () => this.update(), (alpha, dt) => this.render(alpha, dt));
     this.resizeObserver = new ResizeObserver(() => this.renderer.resize());
     this.resizeObserver.observe(this.canvas);
@@ -149,6 +166,88 @@ export class GameScene {
     } catch {
       // storage unavailable
     }
+  }
+
+  /** 샷 시점: straight down from above (항공) or tilted behind the shot. */
+  setShotView(v: ShotView): void {
+    this.renderer.shotView = v;
+    this.shotViewBtn.textContent = v === 'top' ? '🛩️ 샷: 위' : '🎬 샷: 비스듬히';
+    try {
+      localStorage.setItem(SHOT_VIEW_KEY, v);
+    } catch {
+      // storage unavailable
+    }
+  }
+
+  /** Practice mode: offer the real-path preview and (carom tables) the 파이브앤하프 overlay. */
+  enableGuide(on: boolean): void {
+    this.guideAllowed = on;
+    this.pathBtn.hidden = !on;
+    this.systemBtn.hidden = !on || !this.isCarom;
+    if (!on) {
+      this.showPath = this.showSystem = false;
+      this.updateGuideButtons();
+    }
+    this.queueGuide();
+  }
+
+  private get isCarom(): boolean {
+    return PHYSICS[DISCIPLINES[this.discipline].physics] === PHYSICS.carom;
+  }
+
+  private toggleGuide(which: 'path' | 'system'): void {
+    if (which === 'path') this.showPath = !this.showPath;
+    else this.showSystem = !this.showSystem;
+    this.updateGuideButtons();
+    this.queueGuide();
+  }
+
+  private updateGuideButtons(): void {
+    this.pathBtn.classList.toggle('on', this.showPath);
+    this.systemBtn.classList.toggle('on', this.showSystem);
+  }
+
+  /** Recompute the guide at most once per frame (aim changes arrive per pointer event). */
+  private queueGuide(): void {
+    if (this.guideQueued) return;
+    this.guideQueued = true;
+    requestAnimationFrame(() => {
+      this.guideQueued = false;
+      this.computeGuide();
+    });
+  }
+
+  private computeGuide(): void {
+    const s = this.aimState;
+    const cue = this.aim.cuePosition();
+    const active = this.guideAllowed && !!this.turn?.interactive && !this.playing && !!s && !!cue;
+    this.systemPanel.hidden = !(active && this.showSystem);
+    if (!active || (!this.showPath && !this.showSystem)) {
+      this.guide = undefined;
+      return;
+    }
+    const g: GuideOverlay = {};
+    if (this.showPath) {
+      const balls = s.placing ? this.balls.map((b) => (b.id === this.turn!.cueBall ? { ...b, x: s.placing!.x, y: s.placing!.y, pocketed: false } : b)) : this.balls;
+      const power = s.power > 0 ? s.power : this.lastPower;
+      const t = cueTrajectory(this.geom, PHYSICS[DISCIPLINES[this.discipline].physics], balls, this.turn!.cueBall, { angle: s.angle, power, spinX: s.spinX, spinY: s.spinY, elevation: s.elevation });
+      g.trajectory = t.path;
+      g.cushions = t.cushions;
+    }
+    if (this.showSystem && this.isCarom) {
+      const r = fiveAndHalf(this.geom, cue!, s.angle);
+      g.systemLine = r.line;
+      g.arrival = r.arrival;
+      g.labels = r.labels;
+      const n = (v: number | null) => (v === null ? '–' : String(Math.round(v * 10) / 10));
+      this.systemPanel.textContent = '';
+      this.systemPanel.append(
+        h('b', {}, '파이브앤하프'),
+        h('div', {}, `출발 ${n(r.start)} − 1쿠션 ${n(r.first)} = 3쿠션 ${n(r.third)}`),
+        r.note ? h('div.muted', {}, r.note) : h('div.muted', {}, this.showPath ? '분홍 선: 실제로 굴러갈 길' : '〰️ 궤적을 켜면 실제 길과 비교할 수 있어요'),
+      );
+    }
+    this.guide = g;
   }
 
   get geometry(): TableGeometry {
@@ -312,6 +411,7 @@ export class GameScene {
     }
 
     const frame: RenderFrame = { balls, texts: this.texts, rings: this.rings, animating: !!this.sim, holdCamera: this.aim.isPlacing };
+    if (this.guide && this.turn?.interactive && !this.sim) frame.guide = this.guide;
     if (this.turn) frame.highlight = this.turn.cueBall;
     if (!this.sim && this.turn) {
       if (this.turn.interactive && this.aimState) {
@@ -375,6 +475,7 @@ export class GameScene {
     } else {
       this.prediction = undefined;
     }
+    this.queueGuide();
     this.cb.onAim?.({ angle: s.angle, power: s.power, spinX: s.spinX, spinY: s.spinY, elevation: s.elevation, cueBallPos: s.placing ?? undefined });
   }
 
@@ -382,6 +483,9 @@ export class GameScene {
     this.spin.enabled = false;
     this.elevation.enabled = false;
     this.power.enabled = false;
+    this.lastPower = s.power;
+    this.guide = undefined;
+    this.systemPanel.hidden = true;
     this.cb.onShoot({
       input: { angle: s.angle, power: s.power, spinX: s.spinX, spinY: s.spinY, elevation: s.elevation },
       cueBallPos: s.placing ?? undefined,
@@ -396,5 +500,15 @@ function loadCameraMode(): CameraMode {
     return localStorage.getItem(CAMERA_KEY) === 'top' ? 'top' : 'cue';
   } catch {
     return 'cue';
+  }
+}
+
+const SHOT_VIEW_KEY = 'breakshot.shotView';
+
+function loadShotView(): ShotView {
+  try {
+    return localStorage.getItem(SHOT_VIEW_KEY) === 'angled' ? 'angled' : 'top';
+  } catch {
+    return 'top';
   }
 }

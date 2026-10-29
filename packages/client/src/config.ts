@@ -92,3 +92,36 @@ export const RENDER3D = {
   skirtDepth: 0.2,
   ringPool: 16,
 } as const;
+
+/**
+ * 파이브앤하프 (Five & Half) system, Korean convention. Canonical view: the ball starts from the
+ * right (start rail = right long rail / bottom short rail), hits the left long rail first, then the
+ * top short rail, then arrives on the right long rail. Positions are in diamonds:
+ *  - v: along the long rails, measured from the top (2nd-rail) end;
+ *  - u: across, measured from the 1st (left) rail.
+ * 출발값/1쿠션값 use frame points (the diamonds), 3쿠션값 uses rail (cushion nose) points.
+ * Formula: 3쿠션 = 출발 − 1쿠션. Values from windcjg.blogspot.com/2017/04/3.html and
+ * 3c-master.com/systems/five-and-half; half-diamond steps beyond 50 (1쿠션), 70 (출발, short rail)
+ * and 40 (3쿠션) follow those pages. TODO(확인 필요): corrections near the corners are not modelled.
+ */
+export const FIVE_AND_HALF = {
+  /** 1쿠션 values on the left long rail: [v, value]. */
+  first: [[0, 0], [1, 10], [2, 20], [3, 30], [4, 40], [5, 50], [5.5, 60], [6, 70], [6.5, 80], [7, 90]],
+  /** 출발값 on the right long rail (frame): [v, value]; the bottom-right corner (v = 8) is 50. */
+  startLong: [[2, 20], [3, 25], [4, 30], [5, 35], [6, 40], [7, 45], [8, 50]],
+  /** 출발값 on the bottom short rail (frame): [u, value]; the corner (u = 4) is 50. */
+  startShort: [[0.5, 100], [1, 90], [1.5, 80], [2, 70], [3, 60], [4, 50]],
+  /** 3쿠션 arrival values on the right long rail (cushion): [v, value]. */
+  third: [[0, 0], [1, 10], [2, 20], [3, 30], [4, 40], [4.5, 50], [5, 60], [5.5, 70], [6, 80]],
+} as const;
+
+/** Practice guide: simulated cue-ball path. */
+export const GUIDE = {
+  /** Power used for the path preview before the player has pulled the cue. */
+  previewPower: 0.55,
+  /** Stop the preview after this many cue-ball cushions or this much simulated time. */
+  maxCushions: 6,
+  maxSeconds: 8,
+  /** Record a path point every n physics steps. */
+  sampleEvery: 2,
+} as const;

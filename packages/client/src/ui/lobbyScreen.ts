@@ -5,16 +5,27 @@ export function inviteLink(code: string): string {
   return `${location.origin}${location.pathname}?room=${code}`;
 }
 
+export const BREAK_LABELS: Record<RoomSettings['breakDecision'], string> = {
+  random: '랜덤',
+  lag: '뱅킹 (레그 샷)',
+  host: '방장 먼저',
+  guest: '참가자 먼저',
+};
+
 export function settingsSummary(s: RoomSettings): string {
   const c = s.config as unknown as Record<string, unknown>;
   const parts = [DISCIPLINES[s.discipline].name, RULESET_NAMES[s.ruleSet], TABLES[s.table].name];
   if (s.ruleSet === 'wpa8') parts.push(`${c.raceTo}래크 선승`);
   if (s.ruleSet === 'umb3c') parts.push(`${c.targetPoints}점`);
-  if (s.ruleSet === 'pba3c') parts.push(`세트 ${c.setPoints}점 (마지막 ${c.finalSetPoints}점), ${c.setsToWin}세트 선승`);
+  if (s.ruleSet === 'pba3c') {
+    parts.push(`세트 ${c.setPoints}점 (마지막 ${c.finalSetPoints}점), ${c.setsToWin}세트 선승`);
+    const o = c.opening as { mode: string; spots: number[] };
+    parts.push(o.mode === 'draw' ? '초구 배치 추첨' : `초구 배치 ${o.spots.join('-')}`);
+  }
   if (s.ruleSet === 'korean4') parts.push(`목표 ${(c.targets as number[]).join(' / ')}점`);
   parts.push(Number(c.shotClock) > 0 ? `샷클락 ${c.shotClock}초` : '샷클락 없음');
   parts.push(`보조선 ${{ full: '길게', short: '짧게', off: '끄기' }[s.aimAssist]}`);
-  parts.push(`선공 ${s.breakDecision === 'lag' ? '뱅킹' : '랜덤'}`);
+  parts.push(`선공 ${BREAK_LABELS[s.breakDecision]}`);
   return parts.join(' · ');
 }
 

@@ -1,4 +1,5 @@
 import {
+  pbaFormation,
   CAROM_COLORS,
   cueBallFor,
   DISCIPLINES,
@@ -82,6 +83,7 @@ export class GameScreen {
       onAim: (aim) => this.session.sendAim(aim),
     });
     this.scene.setFelt(s.felt);
+    this.scene.enableGuide(session.kind === 'practice');
 
     for (const seat of [0, 1] as Seat[]) {
       const swatch = h('span.swatch');
@@ -303,6 +305,7 @@ export class GameScreen {
       info.push(`이닝 ${s.players[s.breaker].innings}`);
       if (setBased) info.push(`세트 ${s.set} (${s.players[0].sets}:${s.players[1].sets})`);
     }
+    if (s.ruleSet === 'pba3c') info.push(`초구 ${pbaFormation(s).join('-')}`);
     if (s.phase === 'BallInHand') info.push(s.ballInHand === 'kitchen' ? '프리볼 (헤드 스트링 뒤)' : '프리볼');
     if (s.rule.kind === 'carom' && s.rule.lastInning) info.push('마지막 이닝');
     const turnName = s.players[s.current].name;

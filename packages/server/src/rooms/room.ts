@@ -205,6 +205,10 @@ export class Room {
         this.phase = 'lag';
         this.lag = [null, null];
         this.broadcastRoom();
+      } else if (this.settings.breakDecision === 'host') {
+        this.begin(0);
+      } else if (this.settings.breakDecision === 'guest') {
+        this.begin(1);
       } else {
         this.begin(this.deps.random() < 0.5 ? 0 : 1);
       }

@@ -53,6 +53,11 @@ describe('rooms and lobby', () => {
     expect(a.last('match')!.state.players.map((p) => p.name)).toEqual(['Alice', 'Bob']);
   });
 
+  it('honours a fixed first breaker (host / guest) regardless of the coin', () => {
+    expect(startedRoom(settings({ breakDecision: 'host' }), () => 0.9).a.last('match')!.state.current).toBe(0);
+    expect(startedRoom(settings({ breakDecision: 'guest' }), () => 0.1).a.last('match')!.state.current).toBe(1);
+  });
+
   it('rejects invalid settings at the schema level', () => {
     const bad = { ...defaultSettings('threeCushion'), ruleSet: 'wpa8' };
     expect(parseClientMessage(JSON.stringify({ type: 'createRoom', protocol: NET.protocolVersion, nickname: 'A', settings: bad })).ok).toBe(false);

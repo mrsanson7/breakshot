@@ -4,7 +4,11 @@ import {
   applyTimeViolation,
   createMatch,
   judgeShotLog,
+  LAYOUT,
+  pbaFormation,
+  RULE_DEFAULTS,
   RULESETS,
+  TABLES,
   startMatch,
   startNextSet,
   validateShot,
@@ -420,5 +424,48 @@ describe('match engine', () => {
       }
     }
     expect(found).toBe(true);
+  });
+});
+
+describe('PBA opening formation', () => {
+  it('places the breaker, the opponent and the red on the fixed spots', () => {
+    const s = newMatch('pba3c', 'caromLarge', { opening: { mode: 'fixed', spots: [3, 5, 7] } }, 1);
+    const L = TABLES.caromLarge.length;
+    const W = TABLES.caromLarge.width;
+    const pos = (id: string) => s.balls.find((b) => b.id === id)!;
+    // Seat 1 (yellow) breaks.
+    expect(pos('yellow')).toMatchObject({ x: L * LAYOUT.pbaSpots[3].x, y: W * LAYOUT.pbaSpots[3].y });
+    expect(pos('white')).toMatchObject({ x: L * LAYOUT.pbaSpots[5].x, y: W * LAYOUT.pbaSpots[5].y });
+    expect(pos('red')).toMatchObject({ x: L * LAYOUT.pbaSpots[7].x, y: W * LAYOUT.pbaSpots[7].y });
+  });
+
+  it('2-4-8 is the UMB opening', () => {
+    const s = newMatch('pba3c', 'caromLarge', { opening: { mode: 'fixed', spots: [2, 4, 8] } });
+    const L = TABLES.caromLarge.length;
+    const W = TABLES.caromLarge.width;
+    const white = s.balls.find((b) => b.id === 'white')!;
+    expect(white.x).toBeCloseTo(L * LAYOUT.headStringX, 12);
+    expect(Math.abs(white.y - W * LAYOUT.centreY)).toBeCloseTo(LAYOUT.caromBreakOffset, 12);
+  });
+
+  it('a drawn formation stays in range and is the same for every set of the match', () => {
+    for (let seed = 1; seed < 40; seed++) {
+      const f = pbaFormation({ config: { ...RULE_DEFAULTS.pba3c }, seed });
+      expect(f[0]).toBeGreaterThanOrEqual(1);
+      expect(f[0]).toBeLessThanOrEqual(3);
+      expect(f[1]).toBeGreaterThanOrEqual(4);
+      expect(f[1]).toBeLessThanOrEqual(6);
+      expect(f[2]).toBeGreaterThanOrEqual(7);
+      expect(f[2]).toBeLessThanOrEqual(9);
+    }
+    const s = newMatch('pba3c', 'caromLarge');
+    const later = RULESETS.pba3c.setupRack({ ...s, set: 3 }, TABLES.caromLarge, () => 0.99, 0);
+    expect(later.balls).toEqual(s.balls);
+  });
+
+  it('PBA lets the breaker play either object ball first', () => {
+    const n = play(newMatch('pba3c', 'caromLarge'), ['b:yellow', 'c:top', 'c:right', 'c:bottom', 'b:red']);
+    expect(n.lastVerdict!.foul).toBeNull();
+    expect(n.lastVerdict!.points).toBe(1);
   });
 });

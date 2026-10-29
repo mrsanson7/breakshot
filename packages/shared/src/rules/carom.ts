@@ -1,5 +1,6 @@
 import type { FourBallConfig, ThreeCushionPbaConfig, ThreeCushionUmbConfig } from '../config/rules';
-import { fourBallBreak, threeCushionBreak } from '../game/layouts';
+import { fourBallBreak, pbaOpening, threeCushionBreak } from '../game/layouts';
+import { createRng } from '../math/rng';
 import { other, type MatchState, type Seat, type Verdict } from '../game/state';
 import type { ShotLog } from '../physics/types';
 import { analyzeCarom } from './analysis';
@@ -96,6 +97,17 @@ export const threeCushionUmbRules: RuleSet<ThreeCushionUmbConfig> = {
 export const pbaSetTarget = (cfg: ThreeCushionPbaConfig, set: number): number =>
   set >= 2 * cfg.setsToWin - 1 ? cfg.finalSetPoints : cfg.setPoints;
 
+/**
+ * The PBA formation for this match: the configured spots, or one card draw per match (seeded by
+ * the match seed only, so every set uses the same formation).
+ */
+export function pbaFormation(state: Pick<MatchState, 'config' | 'seed'>): [number, number, number] {
+  const o = (state.config as ThreeCushionPbaConfig).opening;
+  if (o.mode === 'fixed') return [...o.spots];
+  const rng = createRng((state.seed ^ 0x5bd1e995) >>> 0);
+  return [1 + Math.floor(rng() * 3), 4 + Math.floor(rng() * 3), 7 + Math.floor(rng() * 3)];
+}
+
 export const threeCushionPbaRules: RuleSet<ThreeCushionPbaConfig> = {
   id: 'pba3c',
   discipline: 'threeCushion',
@@ -103,8 +115,8 @@ export const threeCushionPbaRules: RuleSet<ThreeCushionPbaConfig> = {
   timeoutScope: 'set',
   cueBallOf: (_s, seat) => caromCue(seat),
   initialRuleState: () => ({ kind: 'carom', lastInning: false }),
-  setupRack(state, table, rng) {
-    return { balls: threeCushionBreak(table, caromCue(state.breaker), caromCue(other(state.breaker)), rng() < 0.5 ? 1 : -1), ballInHand: null };
+  setupRack(state, table) {
+    return { balls: pbaOpening(table, caromCue(state.breaker), caromCue(other(state.breaker)), pbaFormation(state)), ballInHand: null };
   },
   setsToWin: (c) => c.setsToWin,
   target: (state) => pbaSetTarget(state.config as ThreeCushionPbaConfig, state.set),

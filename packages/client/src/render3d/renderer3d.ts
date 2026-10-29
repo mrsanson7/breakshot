@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { AimPrediction, BallDef, BallState, TableGeometry, Vec2 } from '@breakshot/shared';
-import { RENDER3D } from '../config';
+import { GUIDE, RENDER3D } from '../config';
 import { buildTable, type TableMeshes, type TablePalette } from './table';
 import { ballTexture } from './textures';
-import type { CameraMode, CueOverlay, FloatingText, RenderFrame, ScreenMapper } from './types';
+import type { CameraMode, ShotView, CueOverlay, FloatingText, GuideOverlay, RenderFrame, ScreenMapper } from './types';
 
 const DEG = Math.PI / 180;
 const UP = new THREE.Vector3(0, 0, 1);
@@ -18,6 +18,8 @@ export class Renderer3D implements ScreenMapper {
   readonly overlay: HTMLCanvasElement;
   readonly palette: TablePalette;
   cameraMode: CameraMode = 'cue';
+  /** While the balls roll: straight down from above (항공) or the tilted view behind the shot. */
+  shotView: ShotView = 'top';
 
   private gl: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
@@ -32,6 +34,8 @@ export class Renderer3D implements ScreenMapper {
   private cue: THREE.Group;
   private cueMaterials: THREE.MeshStandardMaterial[] = [];
   private aimMeshes: THREE.Mesh[];
+  private guideMeshes: { path: THREE.Mesh; system: THREE.Mesh; arrival: THREE.Mesh; dots: THREE.Mesh[] };
+  private lastGuide: GuideOverlay | undefined | null = null;
   private lastAim: AimPrediction | undefined | null = null;
   private ringPool: THREE.Mesh[] = [];
   private raycaster = new THREE.Raycaster();
@@ -135,6 +139,26 @@ export class Renderer3D implements ScreenMapper {
       return mesh;
     });
 
+    const guideMesh = (color: number, opacity: number) => {
+      const mesh = new THREE.Mesh(new THREE.BufferGeometry(), aimMat(color, opacity));
+      mesh.renderOrder = 1;
+      this.scene.add(mesh);
+      return mesh;
+    };
+    const arrival = new THREE.Mesh(new THREE.RingGeometry(this.R * 0.9, this.R * 1.25, 40), aimMat(0xff9ad5, 0.95));
+    arrival.visible = false;
+    arrival.renderOrder = 2;
+    this.scene.add(arrival);
+    const dotGeom = new THREE.CircleGeometry(this.R * 0.35, 20);
+    const dots = Array.from({ length: GUIDE.maxCushions }, () => {
+      const m = new THREE.Mesh(dotGeom, aimMat(0xff7ad9, 1));
+      m.visible = false;
+      m.renderOrder = 2;
+      this.scene.add(m);
+      return m;
+    });
+    this.guideMeshes = { path: guideMesh(0xff7ad9, 0.85), system: guideMesh(0xffa64d, 0.9), arrival, dots };
+
     for (let i = 0; i < RENDER3D.ringPool; i++) {
       const m = new THREE.Mesh(new THREE.RingGeometry(1, 1.12, 48), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthWrite: false }));
       m.visible = false;
@@ -216,8 +240,8 @@ export class Renderer3D implements ScreenMapper {
     return { x: o.x + d.x * 100, y: o.y + d.y * 100 };
   }
 
-  toScreen(p: Vec2): Vec2 {
-    const v = new THREE.Vector3(p.x, p.y, this.R).project(this.camera);
+  toScreen(p: Vec2, z = this.R): Vec2 {
+    const v = new THREE.Vector3(p.x, p.y, z).project(this.camera);
     return { x: ((v.x + 1) / 2) * this.cssW, y: ((1 - v.y) / 2) * this.cssH };
   }
 
@@ -251,6 +275,7 @@ export class Renderer3D implements ScreenMapper {
     }
 
     this.updateAim(frame.aim);
+    this.updateGuide(frame.animating ? undefined : frame.guide);
     this.updateCue(frame.cue);
 
     let i = 0;
@@ -270,7 +295,7 @@ export class Renderer3D implements ScreenMapper {
     if (frame.cue) this.lastCue = { at: frame.cue.at, angle: frame.cue.angle };
     this.updateCamera(frame, dt);
     this.gl.render(this.scene, this.camera);
-    this.drawOverlay(frame.texts ?? []);
+    this.drawOverlay(frame.texts ?? [], frame.animating ? undefined : frame.guide);
   }
 
   // -------------------------------------------------------------------------------------------
@@ -281,7 +306,8 @@ export class Renderer3D implements ScreenMapper {
     const L = g.length;
     const W = g.width;
     const centre = new THREE.Vector3(L / 2, W / 2, 0);
-    if (this.cameraMode === 'top' || !this.lastCue) {
+    const aerial = frame.animating && this.shotView === 'top';
+    if (this.cameraMode === 'top' || !this.lastCue || aerial) {
       const ex = L / 2 + g.spec.railWidth;
       const ey = W / 2 + g.spec.railWidth;
       const tanV = Math.tan((RENDER3D.fovDeg / 2) * DEG);
@@ -448,14 +474,47 @@ export class Renderer3D implements ScreenMapper {
   }
 
   // -------------------------------------------------------------------------------------------
+  // Practice guide
+
+  private updateGuide(guide: GuideOverlay | undefined): void {
+    if (guide === this.lastGuide) return;
+    this.lastGuide = guide;
+    const g = this.guideMeshes;
+    const a = RENDER3D.aimLine;
+    g.path.geometry.dispose();
+    g.system.geometry.dispose();
+    g.path.geometry = ribbon(guide?.trajectory ?? [], a.width, a.lift * 1.5, false);
+    g.system.geometry = ribbon(guide?.systemLine ?? [], a.width * 0.8, this.table.railTop + 0.001, true);
+    g.arrival.visible = !!guide?.arrival;
+    if (guide?.arrival) g.arrival.position.set(guide.arrival.x, guide.arrival.y, a.lift * 2);
+    g.dots.forEach((m, i) => {
+      const p = guide?.cushions?.[i];
+      m.visible = !!p;
+      if (p) m.position.set(p.x, p.y, a.lift * 2.5);
+    });
+  }
+
+  // -------------------------------------------------------------------------------------------
   // Floating texts (2D overlay)
 
-  private drawOverlay(texts: FloatingText[]): void {
+  private drawOverlay(texts: FloatingText[], guide: GuideOverlay | undefined): void {
     const ctx = this.octx;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, this.overlay.width, this.overlay.height);
-    if (texts.length === 0) return;
+    if (texts.length === 0 && !guide?.labels?.length) return;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (const l of guide?.labels ?? []) {
+      const p = this.toScreen(l.at, l.onRail ? this.table.railTop : 0.001);
+      if (p.x < -20 || p.y < -20 || p.x > this.cssW + 20 || p.y > this.cssH + 20) continue;
+      ctx.font = `${l.bold ? 700 : 500} ${l.bold ? 13 : 11}px "IBM Plex Sans KR", system-ui, sans-serif`;
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+      ctx.strokeText(l.text, p.x, p.y);
+      ctx.fillStyle = l.color;
+      ctx.fillText(l.text, p.x, p.y);
+    }
     for (const t of texts) {
       const p = this.toScreen(t.at);
       const size = t.size ?? 28;

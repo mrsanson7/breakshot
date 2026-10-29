@@ -185,7 +185,17 @@ button, select, input { font: inherit; color: inherit; }
 
 /* 3D view */
 .overlay-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-.btn.camera { position: absolute; top: 8px; right: 8px; font-size: 13px; padding: 6px 10px; background: rgba(20, 27, 33, .85); }
+.view-buttons { position: absolute; top: 8px; right: 8px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.btn.camera { font-size: 13px; padding: 6px 10px; background: rgba(20, 27, 33, .85); }
+.btn.camera.on { border-color: #ff9ad5; color: #ffd1ec; box-shadow: 0 0 0 1px #ff9ad5 inset; }
+.system-panel { position: absolute; left: 8px; bottom: 8px; max-width: min(320px, 70%); padding: 8px 10px; border-radius: 8px; background: rgba(12, 16, 20, .82); color: #e8eef2; font-size: 12px; line-height: 1.45; pointer-events: none; }
+.system-panel b { color: #ffa64d; }
+.system-panel[hidden] { display: none; }
 .elev { display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .elev-canvas { width: 84px; height: 84px; cursor: ns-resize; touch-action: none; }
 .elev-label { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+@media (max-width: 760px) {
+  .view-buttons { flex-direction: row; flex-wrap: wrap; justify-content: flex-end; left: 8px; }
+  .view-buttons .btn.camera { font-size: 12px; padding: 5px 8px; }
+  .system-panel { font-size: 11px; }
+}

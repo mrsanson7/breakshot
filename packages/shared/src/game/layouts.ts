@@ -74,3 +74,14 @@ export function fourBallBreak(table: TableSpec, breakerBall: string, otherBall: 
     at('red2', L * LAYOUT.centreX, W * LAYOUT.centreY),
   ];
 }
+
+/** PBA opening: breaker's ball, opponent's ball and red on the given spots (see LAYOUT.pbaSpots). */
+export function pbaOpening(table: TableSpec, breakerBall: string, otherBall: string, spots: readonly [number, number, number]): BallPosition[] {
+  const L = table.length;
+  const W = table.width;
+  const ids = [breakerBall, otherBall, 'red'];
+  return spots.map((n, i) => {
+    const p = LAYOUT.pbaSpots[n];
+    return at(ids[i], L * p.x, W * p.y);
+  });
+}

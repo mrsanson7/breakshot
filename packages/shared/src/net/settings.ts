@@ -5,7 +5,8 @@ import type { TableId } from '../config/tables';
 import type { AimAssistLevel } from '../config/aim';
 
 /** How the first breaker is chosen. */
-export type BreakDecision = 'lag' | 'random';
+/** How the first breaker is chosen: random, lag (뱅킹), or fixed to the host / the guest. */
+export type BreakDecision = 'lag' | 'random' | 'host' | 'guest';
 
 /** Everything chosen on the "방 만들기" (or practice setup) screen. */
 export interface RoomSettings<R extends RuleSetId = RuleSetId> {
@@ -51,6 +52,10 @@ export const ruleConfigSchemas = {
     }),
     setBreak: z.enum(['alternate', 'loser']),
     breakMustHitRedFirst: z.boolean(),
+    opening: z.object({
+      mode: z.enum(['draw', 'fixed']),
+      spots: z.tuple([z.number().int().min(1).max(3), z.number().int().min(4).max(6), z.number().int().min(7).max(9)]),
+    }),
   }),
   korean4: z.object({
     ...clock,
@@ -61,7 +66,7 @@ export const ruleConfigSchemas = {
 
 const common = {
   aimAssist: z.enum(['full', 'short', 'off']),
-  breakDecision: z.enum(['lag', 'random']),
+  breakDecision: z.enum(['lag', 'random', 'host', 'guest']),
   felt: z
     .string()
     .regex(/^#[0-9a-fA-F]{6}$/)

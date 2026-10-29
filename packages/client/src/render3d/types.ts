@@ -42,14 +42,29 @@ export interface RenderFrame {
   rings?: { at: Vec2; age: number; color: string }[];
   /** Balls are rolling (cue view pulls back to an overview). */
   animating?: boolean;
+  /** Practice guide: real cue-ball path and a billiards system overlay. */
+  guide?: GuideOverlay;
   /** Keep the camera still (the player is dragging the cue ball). */
   holdCamera?: boolean;
 }
 
 export type CameraMode = 'top' | 'cue';
+export type ShotView = 'top' | 'angled';
 
 /** Screen (CSS px, canvas-relative) ↔ table (m) mapping used by the input code. */
 export interface ScreenMapper {
   toWorld(p: Vec2): Vec2;
   toScreen(p: Vec2): Vec2;
+}
+
+export interface GuideOverlay {
+  /** Simulated cue-ball path. */
+  trajectory?: Vec2[];
+  /** Cushion contacts along it. */
+  cushions?: Vec2[];
+  /** System line (start → cue ball → 1st rail). */
+  systemLine?: Vec2[];
+  /** Predicted arrival point. */
+  arrival?: Vec2 | null;
+  labels?: { at: Vec2; text: string; color: string; onRail?: boolean; bold?: boolean }[];
 }

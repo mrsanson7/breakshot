@@ -60,7 +60,7 @@ export class App {
     this.mount(
       setupForm(
         'practice',
-        (r) => this.play(new PracticeSession(r.settings, { freePlay: r.freePlay, names: r.names })),
+        (r) => this.play(new PracticeSession(r.settings, { freePlay: r.freePlay, names: r.names, firstBreaker: r.firstBreaker })),
         () => this.title(),
       ),
     );

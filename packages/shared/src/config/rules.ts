@@ -59,6 +59,14 @@ export interface ThreeCushionPbaConfig extends ClockConfig {
   /** Who breaks each new set. */
   setBreak: 'alternate' | 'loser';
   breakMustHitRedFirst: boolean;
+  /** PBA opening formation (spots in LAYOUT.pbaSpots): drawn once per match, or fixed. */
+  opening: PbaOpening;
+}
+
+export interface PbaOpening {
+  mode: 'draw' | 'fixed';
+  /** [breaker's ball 1–3, opponent's ball 4–6, red 7–9] — used when mode = 'fixed'. */
+  spots: [number, number, number];
 }
 
 export interface FourBallConfig extends ClockConfig {
@@ -101,7 +109,9 @@ export const RULE_DEFAULTS: RuleConfigs = {
     setsToWin: 3,
     bankShot: { enabled: true, minCushionsBeforeFirstBall: 1, points: 2 },
     setBreak: 'alternate',
-    breakMustHitRedFirst: true,
+    // PBA: the breaker may play either object ball first (UMB requires the red).
+    breakMustHitRedFirst: false,
+    opening: { mode: 'draw', spots: [2, 4, 8] },
     shotClock: 35, // spec: "30초대"
     timeouts: 1, // per set
     extensionSeconds: 35,
