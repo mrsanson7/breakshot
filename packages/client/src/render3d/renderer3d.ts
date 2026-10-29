@@ -4,7 +4,7 @@ import type { AimPrediction, BallDef, BallState, TableGeometry, Vec2 } from '@br
 import { GUIDE, RENDER3D } from '../config';
 import { buildTable, type TableMeshes, type TablePalette } from './table';
 import { ballTexture } from './textures';
-import type { CameraMode, ShotView, CueOverlay, FloatingText, GuideOverlay, RenderFrame, ScreenMapper } from './types';
+import type { CameraMode, CueOverlay, FloatingText, GuideOverlay, RenderFrame, ScreenMapper } from './types';
 
 const DEG = Math.PI / 180;
 const UP = new THREE.Vector3(0, 0, 1);
@@ -19,7 +19,8 @@ export class Renderer3D implements ScreenMapper {
   readonly palette: TablePalette;
   cameraMode: CameraMode = 'cue';
   /** While the balls roll: straight down from above (항공) or the tilted view behind the shot. */
-  shotView: ShotView = 'top';
+  /** 항공 보기: look straight down while aiming too (cue view keeps its drag-to-turn aim). */
+  aerialAim = false;
 
   private gl: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
@@ -306,7 +307,8 @@ export class Renderer3D implements ScreenMapper {
     const L = g.length;
     const W = g.width;
     const centre = new THREE.Vector3(L / 2, W / 2, 0);
-    const aerial = frame.animating && this.shotView === 'top';
+    // Rolling balls are always watched from straight above so the whole path shows.
+    const aerial = frame.animating || (this.aerialAim && !frame.holdCamera);
     if (this.cameraMode === 'top' || !this.lastCue || aerial) {
       const ex = L / 2 + g.spec.railWidth;
       const ey = W / 2 + g.spec.railWidth;

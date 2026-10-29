@@ -49,7 +49,6 @@ export interface RenderFrame {
 }
 
 export type CameraMode = 'top' | 'cue';
-export type ShotView = 'top' | 'angled';
 
 /** Screen (CSS px, canvas-relative) ↔ table (m) mapping used by the input code. */
 export interface ScreenMapper {

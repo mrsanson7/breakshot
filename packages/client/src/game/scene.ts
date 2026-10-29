@@ -20,7 +20,7 @@ import {
 } from '@breakshot/shared';
 import { AimController, type AimState } from '../input/aimController';
 import { Renderer3D } from '../render3d/renderer3d';
-import type { CameraMode, FloatingText, GuideOverlay, RenderFrame, ShotView } from '../render3d/types';
+import type { CameraMode, FloatingText, GuideOverlay, RenderFrame } from '../render3d/types';
 import { cueTrajectory, fiveAndHalf } from './systems';
 import { h } from '../ui/dom';
 import { PowerBar } from '../ui/powerBar';
@@ -72,7 +72,7 @@ export class GameScene {
   readonly power: PowerBar;
   private renderer: Renderer3D;
   private cameraBtn: HTMLButtonElement;
-  private shotViewBtn: HTMLButtonElement;
+  private aerialBtn: HTMLButtonElement;
   private pathBtn: HTMLButtonElement;
   private systemBtn: HTMLButtonElement;
   private systemPanel: HTMLDivElement;
@@ -116,18 +116,18 @@ export class GameScene {
     });
     const fine = h('div.fine-aim', {}, this.repeatButton('⟲', () => this.aim.nudge(CONTROLS.fineAimStepDeg)), this.repeatButton('⟳', () => this.aim.nudge(-CONTROLS.fineAimStepDeg)));
     this.cameraBtn = h('button.btn.fine.camera', { title: '시점 바꾸기 (위 / 큐 뒤)', onclick: () => this.setCameraMode(this.renderer.cameraMode === 'cue' ? 'top' : 'cue') });
-    this.shotViewBtn = h('button.btn.fine.camera', { title: '공이 굴러갈 때 시점 (위 / 비스듬히)', onclick: () => this.setShotView(this.renderer.shotView === 'top' ? 'angled' : 'top') });
+    this.aerialBtn = h('button.btn.fine.camera', { title: '항공 보기: 조준할 때도 위에서 내려다보기 (조작은 그대로)', onclick: () => this.setAerial(!this.renderer.aerialAim) }, '🛩️ 항공');
     this.pathBtn = h('button.btn.fine.camera', { hidden: true, title: '실제로 굴러갈 길 보기 (연습 모드)', onclick: () => this.toggleGuide('path') }, '〰️ 궤적');
     this.systemBtn = h('button.btn.fine.camera', { hidden: true, title: '파이브앤하프 시스템 보기 (연습 모드)', onclick: () => this.toggleGuide('system') }, '📐 시스템');
     this.systemPanel = h('div.system-panel', { hidden: true });
-    this.el = h('div.scene', {}, h('div.stage', {}, this.canvas, this.renderer.overlay, h('div.view-buttons', {}, this.cameraBtn, this.shotViewBtn, this.pathBtn, this.systemBtn), this.systemPanel), h('div.scene-controls', {}, this.spin.el, this.elevation.el, fine, this.power.el));
+    this.el = h('div.scene', {}, h('div.stage', {}, this.canvas, this.renderer.overlay, h('div.view-buttons', {}, this.cameraBtn, this.aerialBtn, this.pathBtn, this.systemBtn), this.systemPanel), h('div.scene-controls', {}, this.spin.el, this.elevation.el, fine, this.power.el));
     this.aim = new AimController(this.canvas, this.renderer, {
       onChange: (s) => this.onAimChange(s),
       onShoot: (s) => this.onShoot(s),
     });
     this.aim.maxElevation = phys.maxCueElevationDeg;
     this.setCameraMode(loadCameraMode());
-    this.setShotView(loadShotView());
+    this.setAerial(loadAerial());
     this.loop = new FixedLoop(phys.timeStep, () => this.update(), (alpha, dt) => this.render(alpha, dt));
     this.resizeObserver = new ResizeObserver(() => this.renderer.resize());
     this.resizeObserver.observe(this.canvas);
@@ -161,6 +161,8 @@ export class GameScene {
     this.renderer.cameraMode = mode;
     this.aim.rotateMode = mode === 'cue';
     this.cameraBtn.textContent = mode === 'cue' ? '🎥 큐' : '🗺️ 위';
+    // The top view already looks straight down.
+    this.aerialBtn.hidden = mode === 'top';
     try {
       localStorage.setItem(CAMERA_KEY, mode);
     } catch {
@@ -168,12 +170,12 @@ export class GameScene {
     }
   }
 
-  /** 샷 시점: straight down from above (항공) or tilted behind the shot. */
-  setShotView(v: ShotView): void {
-    this.renderer.shotView = v;
-    this.shotViewBtn.textContent = v === 'top' ? '🛩️ 샷: 위' : '🎬 샷: 비스듬히';
+  /** 항공 보기 on/off: the camera goes straight up over the table right away, also while aiming. */
+  setAerial(on: boolean): void {
+    this.renderer.aerialAim = on;
+    this.aerialBtn.classList.toggle('on', on);
     try {
-      localStorage.setItem(SHOT_VIEW_KEY, v);
+      localStorage.setItem(AERIAL_KEY, on ? '1' : '0');
     } catch {
       // storage unavailable
     }
@@ -503,12 +505,12 @@ function loadCameraMode(): CameraMode {
   }
 }
 
-const SHOT_VIEW_KEY = 'breakshot.shotView';
+const AERIAL_KEY = 'breakshot.aerial';
 
-function loadShotView(): ShotView {
+function loadAerial(): boolean {
   try {
-    return localStorage.getItem(SHOT_VIEW_KEY) === 'angled' ? 'angled' : 'top';
+    return localStorage.getItem(AERIAL_KEY) === '1';
   } catch {
-    return 'top';
+    return false;
   }
 }
