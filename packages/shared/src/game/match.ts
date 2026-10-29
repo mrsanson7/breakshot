@@ -134,6 +134,8 @@ export function validateShot(state: MatchState, seat: Seat, req: ShotRequest): S
   if (![angle, power, spinX, spinY].every(Number.isFinite)) return 'badInput';
   if (power <= 0 || power > 1) return 'badInput';
   if (Math.hypot(spinX, spinY) > 1 + 1e-9) return 'badInput';
+  const elevation = req.input.elevation ?? 0;
+  if (!Number.isFinite(elevation) || elevation < 0 || elevation > physicsOf(state).maxCueElevationDeg) return 'badInput';
   if (state.ballInHand) {
     if (!req.cueBallPos) return 'placementRequired';
     const cue = rulesOf(state).cueBallOf(state, seat);

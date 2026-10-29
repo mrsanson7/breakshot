@@ -8,6 +8,8 @@ export interface AimState {
   power: number;
   spinX: number;
   spinY: number;
+  /** Cue elevation (deg), 0 = level. */
+  elevation: number;
   /** Ball-in-hand position being dragged (null when not placing). */
   placing: Vec2 | null;
   placementValid: boolean;
@@ -36,10 +38,12 @@ const DEG = Math.PI / 180;
  *  - press and pull back, release: shoot (power ∝ pull distance)
  *  - rotate mode (camera behind the cue): drag sideways to turn; shoot with the power bar
  *  - ball in hand: press on the cue ball and drag to place it
- *  - arrow keys: fine aim (0.1°, Shift = 1°); W/A/S/D: spin; Esc / right click: cancel
+ *  - arrow keys: fine aim (0.1°, Shift = 1°); W/A/S/D: spin; Q/E: raise/lower the cue; Esc / right click: cancel
  */
 export class AimController {
-  state: AimState = { angle: 0, power: 0, spinX: 0, spinY: 0, placing: null, placementValid: true };
+  state: AimState = { angle: 0, power: 0, spinX: 0, spinY: 0, elevation: 0, placing: null, placementValid: true };
+  /** Steepest elevation allowed (deg). */
+  maxElevation = 0;
   private enabled = false;
   private ctx: AimContext | null = null;
   private pull: { start: Vec2; pointer: number } | null = null;
@@ -114,6 +118,11 @@ export class AimController {
     const l = Math.hypot(x, y);
     this.state.spinX = l > 1 ? x / l : x;
     this.state.spinY = l > 1 ? y / l : y;
+    this.emit();
+  }
+
+  setElevation(deg: number): void {
+    this.state.elevation = Math.max(0, Math.min(this.maxElevation, deg));
     this.emit();
   }
 
@@ -301,6 +310,14 @@ export class AimController {
       case 'd':
       case 'D':
         this.setSpin(this.state.spinX + s, this.state.spinY);
+        return;
+      case 'q':
+      case 'Q':
+        this.setElevation(this.state.elevation + CONTROLS.elevationKeyStepDeg);
+        return;
+      case 'e':
+      case 'E':
+        this.setElevation(this.state.elevation - CONTROLS.elevationKeyStepDeg);
         return;
       case 'Escape':
         this.cancel();

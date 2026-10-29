@@ -34,6 +34,8 @@ export interface ShotInput {
   /** Tip offset, −1..1 each, |(spinX, spinY)| ≤ 1. +x = right english, +y = follow (top). */
   spinX: number;
   spinY: number;
+  /** Cue elevation above level (deg), 0 = level. Omitted = level. */
+  elevation?: number;
 }
 
 export type ShotEvent =

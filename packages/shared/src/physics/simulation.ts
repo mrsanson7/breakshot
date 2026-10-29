@@ -58,7 +58,14 @@ export class Simulation {
     return b;
   }
 
-  /** Apply a level cue strike to the given ball. */
+  /**
+   * Apply a cue strike. The cue pushes along c = (d·cos α, −sin α) where α is the elevation; the tip
+   * meets the ball at offset e (perpendicular to c). Impulse per unit mass V along c gives
+   * ω = k · V · (ê × c) / R with ê = e / R (k = 5/2 for a solid sphere). The bed absorbs the
+   * downward part, so the ball leaves at V·cos α along d. Level cue: ω reduces to follow/draw about
+   * the horizontal axis and side spin about z. Raised cue with side: part of the spin turns about
+   * the travel axis, and cloth friction then bends the path (massé).
+   */
   strike(ballId: string, input: ShotInput): void {
     const p = this.phys;
     const b = this.ball(ballId);
@@ -73,13 +80,20 @@ export class Simulation {
       sx /= sl;
       sy /= sl;
     }
-    const k = (p.cueSpinFactor * speed * p.maxTipOffset) / this.R;
-    b.vx = dx * speed;
-    b.vy = dy * speed;
-    // Rolling forward along d means ω_h = (−dy, dx)·v/R; follow adds to it, draw opposes it.
-    b.wx = -dy * k * sy;
-    b.wy = dx * k * sy;
-    b.wz = k * sx;
+    const elev = (Math.min(p.maxCueElevationDeg, Math.max(0, input.elevation ?? 0)) * Math.PI) / 180;
+    const ca = Math.cos(elev);
+    const sa = Math.sin(elev);
+    // Cue direction c, "right" of the shot (dy, −dx, 0), and "up" perpendicular to the cue.
+    const c = [dx * ca, dy * ca, -sa];
+    const up = [dx * sa, dy * sa, ca];
+    const o = p.maxTipOffset;
+    const e = [o * (sx * dy + sy * up[0]), o * (-sx * dx + sy * up[1]), o * sy * up[2]];
+    const k = (p.cueSpinFactor * speed) / this.R;
+    b.vx = dx * speed * ca;
+    b.vy = dy * speed * ca;
+    b.wx = k * (e[1] * c[2] - e[2] * c[1]);
+    b.wy = k * (e[2] * c[0] - e[0] * c[2]);
+    b.wz = k * (e[0] * c[1] - e[1] * c[0]);
   }
 
   isMoving(): boolean {

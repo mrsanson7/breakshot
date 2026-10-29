@@ -237,3 +237,40 @@ describe('physics: cushions, pockets and the shot log', () => {
     expect(log.duration).toBeGreaterThan(1);
   });
 });
+
+describe('physics: cue elevation (massé)', () => {
+  const run = (spinX: number, elevation: number | undefined) => {
+    const { geom, phys } = setup('caromLarge', 'carom');
+    const sim = new Simulation(geom, phys, [ball('white', 0.5, 0.71)]);
+    sim.strike('white', { ...shot(0, 0.2, spinX, 0), elevation });
+    // Follow the ball until it stops or reaches a cushion.
+    while (sim.step() && !sim.events.some((e) => e.type === 'cushion'));
+    return sim.ball('white');
+  };
+
+  it('a level cue (elevation 0) is the same as no elevation', () => {
+    expect(run(0.6, 0)).toEqual(run(0.6, undefined));
+  });
+
+  it('a level cue with side spin goes straight', () => {
+    expect(Math.abs(run(0.8, 0).y - 0.71)).toBeLessThan(1e-9);
+  });
+
+  it('a raised cue with right english curves right, left english curves left, symmetrically', () => {
+    const right = run(0.8, 45);
+    const left = run(-0.8, 45);
+    // Shot along +x: "right" is −y.
+    expect(right.y).toBeLessThan(0.71 - 0.02);
+    expect(left.y).toBeGreaterThan(0.71 + 0.02);
+    expect(right.y - 0.71).toBeCloseTo(0.71 - left.y, 9);
+  });
+
+  it('a raised cue sends the ball off slower (part of the stroke goes into the bed)', () => {
+    const { geom, phys } = setup('caromLarge', 'carom');
+    const sim = new Simulation(geom, phys, [ball('white', 0.5, 0.71)]);
+    sim.strike('white', { ...shot(0, 0.5), elevation: 60 });
+    const level = new Simulation(geom, phys, [ball('white', 0.5, 0.71)]);
+    level.strike('white', shot(0, 0.5));
+    expect(sim.ball('white').vx).toBeCloseTo(level.ball('white').vx * 0.5, 9);
+  });
+});

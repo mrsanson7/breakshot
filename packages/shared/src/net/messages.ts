@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { NET } from '../config/net';
+import { PHYSICS } from '../config/physics';
 import type { MatchState, Seat, Verdict } from '../game/state';
 import type { BallPosition, ShotInput } from '../physics/types';
 import { roomSettingsSchema, type RoomSettings } from './settings';
@@ -24,6 +25,8 @@ const roomCode = z
   .length(NET.roomCodeLength)
   .refine((s) => [...s].every((c) => NET.roomCodeAlphabet.includes(c)), 'invalid room code');
 
+const MAX_ELEVATION = Math.max(...Object.values(PHYSICS).map((p) => p.maxCueElevationDeg));
+
 /** Range checks live here (|spin| ≤ 1, 0 < power ≤ 1) so bad input never reaches the engine. */
 export const shotInputSchema = z
   .object({
@@ -31,6 +34,7 @@ export const shotInputSchema = z
     power: finite.gt(0).max(1),
     spinX: finite.min(-1).max(1),
     spinY: finite.min(-1).max(1),
+    elevation: finite.min(0).max(MAX_ELEVATION).optional(),
   })
   .refine((s) => Math.hypot(s.spinX, s.spinY) <= 1 + 1e-9, 'spin outside the ball');
 
@@ -39,6 +43,7 @@ export const aimSchema = z.object({
   power: finite.min(0).max(1),
   spinX: finite.min(-1).max(1),
   spinY: finite.min(-1).max(1),
+  elevation: finite.min(0).max(MAX_ELEVATION).optional(),
   cueBallPos: vec2.optional(),
 });
 

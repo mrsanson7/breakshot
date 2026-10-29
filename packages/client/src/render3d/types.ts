@@ -10,6 +10,8 @@ export interface CueOverlay {
   /** Tip offset on the ball (−1..1), to place the tip where the player is hitting. */
   spinX?: number;
   spinY?: number;
+  /** Cue elevation chosen by the player (deg); the drawn cue is raised further to clear the rail. */
+  elevation?: number;
   /** Opponent's cue: drawn translucent. */
   ghost?: boolean;
 }

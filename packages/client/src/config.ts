@@ -9,6 +9,8 @@ export const CONTROLS = {
   minShotPower: 0.03,
   /** Spin keys (W/A/S/D) step, as a fraction of the maximum tip offset. */
   spinKeyStep: 0.1,
+  /** Q/E keys: cue elevation step (deg). */
+  elevationKeyStepDeg: 5,
   /** Behind-the-cue camera: aim turn per CSS pixel of sideways drag (deg). */
   dragAimDegPerPx: 0.15,
   /** Pressing within this many radii of the cue ball during ball-in-hand picks it up. */
@@ -55,9 +57,16 @@ export const RENDER3D = {
   /** Use the upright (portrait) top view when it makes the table this much bigger. */
   portraitGain: 1.15,
   /** Camera behind the cue ball while aiming. */
-  cueView: { distance: 0.95, height: 0.42, lookAhead: 0.7 },
-  /** While balls roll in cue view the camera rises to look over the whole table. */
-  overview: { height: 3.1, back: 1.7 },
+  cueView: {
+    distance: 0.95,
+    height: 0.42,
+    lookAhead: 0.7,
+    /** At a vertical cue the camera rises this much and steps this far to the right (scaled by sin α). */
+    raisedLift: 0.7,
+    raisedSideStep: 0.35,
+  },
+  /** While balls roll in cue view the camera rises until the whole table fits, tilted this much from straight down. */
+  overview: { tiltDeg: 28, margin: 0.12 },
   /** Camera easing rate (1/s): higher = snappier. */
   cameraFollowRate: 6,
   cue: {

@@ -370,6 +370,9 @@ describe('match engine', () => {
     expect(validateShot(s, 0, { input: { ...ok.input, power: 0 } })).toBe('badInput');
     expect(validateShot(s, 0, { input: { ...ok.input, spinX: 1, spinY: 1 } })).toBe('badInput');
     expect(validateShot(s, 0, { input: { ...ok.input, angle: NaN } })).toBe('badInput');
+    expect(validateShot(s, 0, { input: { ...ok.input, elevation: 61 } })).toBe('badInput');
+    expect(validateShot(s, 0, { input: { ...ok.input, elevation: -1 } })).toBe('badInput');
+    expect(validateShot(s, 0, { input: { ...ok.input, elevation: 30 } })).toBeNull();
     expect(validateShot(s, 0, ok)).toBeNull();
   });
 

@@ -299,14 +299,25 @@ export class Renderer3D implements ScreenMapper {
       const dx = Math.cos(angle);
       const dy = Math.sin(angle);
       const v = RENDER3D.cueView;
-      this.want.pos.set(at.x - dx * v.distance, at.y - dy * v.distance, v.height);
+      // A raised cue would fill the screen: lift the camera and step a little to the side with it.
+      const lift = Math.sin((frame.cue.elevation ?? 0) * DEG);
+      const side = v.raisedSideStep * lift;
+      this.want.pos.set(at.x - dx * v.distance + dy * side, at.y - dy * v.distance - dx * side, v.height + v.raisedLift * lift);
       this.want.target.set(at.x + dx * v.lookAhead, at.y + dy * v.lookAhead, 0);
       this.want.up.copy(UP);
     } else if (frame.animating && this.lastCue) {
+      // Pull back and up until the whole table (rails included) fits, looking along the shot.
       const dx = Math.cos(this.lastCue.angle);
       const dy = Math.sin(this.lastCue.angle);
-      const o = RENDER3D.overview;
-      this.want.pos.set(centre.x - dx * o.back, centre.y - dy * o.back, o.height);
+      const ex = L / 2 + g.spec.railWidth;
+      const ey = W / 2 + g.spec.railWidth;
+      const along = Math.abs(dx) * ex + Math.abs(dy) * ey;
+      const across = Math.abs(dy) * ex + Math.abs(dx) * ey;
+      const tanV = Math.tan((RENDER3D.fovDeg / 2) * DEG);
+      const tilt = RENDER3D.overview.tiltDeg * DEG;
+      // The tilt foreshortens the table along the view; cos(tilt) is enough for these angles.
+      const d = Math.max((along * Math.cos(tilt)) / tanV, across / (tanV * this.camera.aspect)) * (1 + RENDER3D.overview.margin);
+      this.want.pos.set(centre.x - dx * d * Math.sin(tilt), centre.y - dy * d * Math.sin(tilt), d * Math.cos(tilt));
       this.want.target.copy(centre);
       this.want.up.copy(UP);
     }
@@ -376,19 +387,33 @@ export class Renderer3D implements ScreenMapper {
     const R = this.R;
     const dx = Math.cos(cue.angle);
     const dy = Math.sin(cue.angle);
-    const back = R + c.gap + cue.pull * c.maxPull;
-    const off = this.maxTipOffset * R;
-    const sx = (cue.spinX ?? 0) * off;
-    const sy = (cue.spinY ?? 0) * off;
-    // Right of the shot direction is (dy, −dx).
-    const tip = new THREE.Vector3(cue.at.x - dx * back + dy * sx, cue.at.y - dy * back - dx * sx, R + sy);
-    // Raise the butt enough to clear the rail behind the cue ball.
-    const toRail = this.distanceToRail(cue.at, -dx, -dy) - back;
-    const rise = this.table.railTop + c.railClearance - tip.z;
-    let elev = c.minElevationDeg * DEG;
+    const pull = c.gap + cue.pull * c.maxPull;
+    let sx = cue.spinX ?? 0;
+    let sy = cue.spinY ?? 0;
+    const sl = Math.hypot(sx, sy);
+    if (sl > 1) {
+      sx /= sl;
+      sy /= sl;
+    }
+    // Raise the butt at least enough to clear the rail behind the cue ball.
+    let elev = Math.max(c.minElevationDeg, cue.elevation ?? 0) * DEG;
+    const toRail = this.distanceToRail(cue.at, -dx, -dy) - R - pull;
+    const rise = this.table.railTop + c.railClearance - R;
     if (toRail > 0.01 && rise > 0) elev = Math.max(elev, Math.atan2(rise, toRail));
+    elev = Math.min(elev, 85 * DEG);
+    // Same geometry as Simulation.strike: cue axis c, tip offset ê ⟂ c, contact on the sphere.
+    const ca = Math.cos(elev);
+    const sa = Math.sin(elev);
+    const axis = new THREE.Vector3(dx * ca, dy * ca, -sa);
+    const up = new THREE.Vector3(dx * sa, dy * sa, ca);
+    const right = new THREE.Vector3(dy, -dx, 0);
+    const e = right.multiplyScalar(sx * this.maxTipOffset).addScaledVector(up, sy * this.maxTipOffset);
+    const n = Math.sqrt(Math.max(0, 1 - e.lengthSq()));
+    const tip = new THREE.Vector3(cue.at.x, cue.at.y, R)
+      .addScaledVector(e, R)
+      .addScaledVector(axis, -(R * n + pull));
     this.cue.position.copy(tip);
-    this.cue.rotation.set(0, Math.min(elev, 35 * DEG), cue.angle);
+    this.cue.rotation.set(0, elev, cue.angle);
     this.cue.visible = true;
     for (const m of this.cueMaterials) m.opacity = cue.ghost ? 0.45 : 1;
   }

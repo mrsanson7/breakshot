@@ -248,7 +248,7 @@ export class OnlineSession implements Session {
     const a = this.pendingAim;
     this.pendingAim = null;
     this.lastAimSent = performance.now();
-    this.socket.send({ type: 'aim', aim: { angle: a.angle, power: a.power, spinX: a.spinX, spinY: a.spinY, cueBallPos: a.cueBallPos } });
+    this.socket.send({ type: 'aim', aim: { angle: a.angle, power: a.power, spinX: a.spinX, spinY: a.spinY, elevation: a.elevation, cueBallPos: a.cueBallPos } });
   }
 
   useTimeout(): void {

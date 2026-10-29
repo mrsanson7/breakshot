@@ -24,6 +24,7 @@ import type { CameraMode, FloatingText, RenderFrame } from '../render3d/types';
 import { h } from '../ui/dom';
 import { PowerBar } from '../ui/powerBar';
 import { SpinWidget } from '../ui/spinWidget';
+import { ElevationWidget } from '../ui/elevationWidget';
 import { FixedLoop } from './loop';
 import { CONTROLS } from '../config';
 
@@ -33,6 +34,7 @@ export interface RemoteAim {
   power: number;
   spinX: number;
   spinY: number;
+  elevation?: number;
   cueBallPos?: Vec2;
 }
 
@@ -65,6 +67,7 @@ export class GameScene {
   readonly el: HTMLDivElement;
   readonly canvas: HTMLCanvasElement;
   readonly spin: SpinWidget;
+  readonly elevation: ElevationWidget;
   readonly power: PowerBar;
   private renderer: Renderer3D;
   private cameraBtn: HTMLButtonElement;
@@ -94,17 +97,19 @@ export class GameScene {
     const phys = PHYSICS[DISCIPLINES[discipline].physics];
     this.renderer = new Renderer3D(this.canvas, this.geom, DISCIPLINES[discipline].balls, phys.maxTipOffset);
     this.spin = new SpinWidget((x, y) => this.aim.setSpin(x, y));
+    this.elevation = new ElevationWidget(phys.maxCueElevationDeg, (d) => this.aim.setElevation(d));
     this.power = new PowerBar({
       onDrag: (p) => this.aim.setPower(p),
       onRelease: (p) => this.aim.shootWithPower(p),
     });
     const fine = h('div.fine-aim', {}, this.repeatButton('⟲', () => this.aim.nudge(CONTROLS.fineAimStepDeg)), this.repeatButton('⟳', () => this.aim.nudge(-CONTROLS.fineAimStepDeg)));
     this.cameraBtn = h('button.btn.fine.camera', { title: '시점 바꾸기 (위 / 큐 뒤)', onclick: () => this.setCameraMode(this.renderer.cameraMode === 'cue' ? 'top' : 'cue') });
-    this.el = h('div.scene', {}, h('div.stage', {}, this.canvas, this.renderer.overlay), h('div.scene-controls', {}, this.cameraBtn, this.spin.el, fine, this.power.el));
+    this.el = h('div.scene', {}, h('div.stage', {}, this.canvas, this.renderer.overlay, this.cameraBtn), h('div.scene-controls', {}, this.spin.el, this.elevation.el, fine, this.power.el));
     this.aim = new AimController(this.canvas, this.renderer, {
       onChange: (s) => this.onAimChange(s),
       onShoot: (s) => this.onShoot(s),
     });
+    this.aim.maxElevation = phys.maxCueElevationDeg;
     this.setCameraMode(loadCameraMode());
     this.loop = new FixedLoop(phys.timeStep, () => this.update(), (alpha, dt) => this.render(alpha, dt));
     this.resizeObserver = new ResizeObserver(() => this.renderer.resize());
@@ -196,6 +201,7 @@ export class GameScene {
       this.prediction = undefined;
     }
     this.spin.enabled = !!turn?.interactive;
+    this.elevation.enabled = !!turn?.interactive;
     this.power.enabled = !!turn?.interactive;
   }
 
@@ -315,7 +321,7 @@ export class GameScene {
           frame.placement = { at: this.aimState.placing, valid: this.aimState.placementValid };
         }
         if (cuePos) {
-          frame.cue = { at: cuePos, angle: this.aimState.angle, pull: this.aimState.power, spinX: this.aimState.spinX, spinY: this.aimState.spinY };
+          frame.cue = { at: cuePos, angle: this.aimState.angle, pull: this.aimState.power, spinX: this.aimState.spinX, spinY: this.aimState.spinY, elevation: this.aimState.elevation };
           frame.aim = this.prediction;
         }
       } else if (!this.turn.interactive && this.remote) {
@@ -324,7 +330,7 @@ export class GameScene {
           if (this.remote.cueBallPos) {
             frame.balls = balls.map((b) => (b.id === this.turn!.cueBall ? { ...b, x: cue.x, y: cue.y, pocketed: false } : b));
           }
-          frame.cue = { at: { x: cue.x, y: cue.y }, angle: this.remote.angle, pull: this.remote.power, spinX: this.remote.spinX, spinY: this.remote.spinY, ghost: true };
+          frame.cue = { at: { x: cue.x, y: cue.y }, angle: this.remote.angle, pull: this.remote.power, spinX: this.remote.spinX, spinY: this.remote.spinY, elevation: this.remote.elevation, ghost: true };
         }
       }
     }
@@ -358,6 +364,7 @@ export class GameScene {
   private onAimChange(s: AimState): void {
     this.aimState = s;
     this.spin.set(s.spinX, s.spinY);
+    this.elevation.set(s.elevation);
     this.power.set(s.power);
     const assist = this.turn ? AIM_ASSIST[this.turn.assist] : null;
     if (assist && this.turn) {
@@ -368,14 +375,15 @@ export class GameScene {
     } else {
       this.prediction = undefined;
     }
-    this.cb.onAim?.({ angle: s.angle, power: s.power, spinX: s.spinX, spinY: s.spinY, cueBallPos: s.placing ?? undefined });
+    this.cb.onAim?.({ angle: s.angle, power: s.power, spinX: s.spinX, spinY: s.spinY, elevation: s.elevation, cueBallPos: s.placing ?? undefined });
   }
 
   private onShoot(s: AimState): void {
     this.spin.enabled = false;
+    this.elevation.enabled = false;
     this.power.enabled = false;
     this.cb.onShoot({
-      input: { angle: s.angle, power: s.power, spinX: s.spinX, spinY: s.spinY },
+      input: { angle: s.angle, power: s.power, spinX: s.spinX, spinY: s.spinY, elevation: s.elevation },
       cueBallPos: s.placing ?? undefined,
     });
   }

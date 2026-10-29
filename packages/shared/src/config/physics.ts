@@ -44,6 +44,12 @@ export interface PhysicsProfile {
    * spin feel can be tuned without touching the physics code.
    */
   cueSpinFactor: number;
+  /**
+   * Steepest cue elevation the player can choose (deg). 0 = level cue. Raised cues give massé
+   * (curving) shots; the downward part of the stroke goes into the bed, so the ball never jumps.
+   * TODO(확인 필요): real massé goes to ~80°, but the no-jump model gets unrealistic past ~60°.
+   */
+  maxCueElevationDeg: number;
 
   /** Below this speed (m/s) a rolling ball is considered stopped. */
   stopSpeed: number;
@@ -63,6 +69,7 @@ const COMMON = {
   maxCollisionsPerStep: 256,
   cueSpinFactor: 2.5,
   maxTipOffset: 0.5,
+  maxCueElevationDeg: 60,
 } as const;
 
 export const PHYSICS: Record<PhysicsProfileId, PhysicsProfile> = {
