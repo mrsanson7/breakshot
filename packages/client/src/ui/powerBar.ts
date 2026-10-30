@@ -1,8 +1,8 @@
 import { h } from './dom';
 
 /**
- * Power gauge. Shows the pull-back power while aiming with the mouse; on touch screens it is
- * also the shooting control: drag down along the bar to set power, release to shoot.
+ * Power gauge. Shows the power while the cue is pulled back on the table; it is also a second
+ * way to shoot: drag along the bar to set power, release to shoot.
  */
 export class PowerBar {
   readonly el: HTMLDivElement;
@@ -15,7 +15,7 @@ export class PowerBar {
   constructor(private readonly handlers: { onDrag(power: number): void; onRelease(power: number): void }) {
     this.fill = h('div.power-fill');
     this.label = h('span.power-label', {}, '0%');
-    const track = h('div.power-track', { title: '마우스: 테이블을 누른 채 뒤로 당겼다 놓기 · 터치: 이 막대를 아래로 끌었다 놓기' }, this.fill);
+    const track = h('div.power-track', { title: '보조 조작: 이 막대를 끌었다 놓아도 칩니다 (기본은 테이블에서 큐를 뒤로 당겼다 놓기)' }, this.fill);
     this.el = h('div.power', {}, h('span.power-title', {}, '파워'), track, this.label);
     track.addEventListener('pointerdown', (e) => {
       if (!this.enabled) return;

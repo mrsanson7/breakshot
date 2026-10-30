@@ -7,6 +7,12 @@ export const CONTROLS = {
   coarseAimStepDeg: 1,
   /** Pulling the mouse back this many CSS pixels gives full power. */
   pullPixelsForFullPower: 240,
+  /** Behind-the-cue camera: a drag decides between turning and pulling after this many CSS pixels. */
+  strokeLockPixels: 8,
+  /** Top view + touch: pressing this close (CSS px) to the cue ball or the cue behind it pulls the cue. */
+  touchCueGrabPixels: 36,
+  /** Top view + touch: how much of the cue behind the ball can be grabbed (m). */
+  touchCueGrabLength: 0.7,
   /** Releases below this power cancel the shot instead of tapping the ball. */
   minShotPower: 0.03,
   /** Spin keys (W/A/S/D) step, as a fraction of the maximum tip offset. */

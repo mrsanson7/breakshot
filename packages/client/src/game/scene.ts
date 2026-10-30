@@ -72,7 +72,6 @@ export class GameScene {
   readonly power: PowerBar;
   private renderer: Renderer3D;
   private cameraBtn: HTMLButtonElement;
-  private aerialBtn: HTMLButtonElement;
   private pathBtn: HTMLButtonElement;
   private systemBtn: HTMLButtonElement;
   private systemPanel: HTMLDivElement;
@@ -116,18 +115,16 @@ export class GameScene {
     });
     const fine = h('div.fine-aim', {}, this.repeatButton('⟲', () => this.aim.nudge(CONTROLS.fineAimStepDeg)), this.repeatButton('⟳', () => this.aim.nudge(-CONTROLS.fineAimStepDeg)));
     this.cameraBtn = h('button.btn.fine.camera', { title: '시점 바꾸기 (위 / 큐 뒤)', onclick: () => this.setCameraMode(this.renderer.cameraMode === 'cue' ? 'top' : 'cue') });
-    this.aerialBtn = h('button.btn.fine.camera', { title: '항공 보기: 조준할 때도 위에서 내려다보기 (조작은 그대로)', onclick: () => this.setAerial(!this.renderer.aerialAim) }, '🛩️ 항공');
     this.pathBtn = h('button.btn.fine.camera', { hidden: true, title: '실제로 굴러갈 길 보기 (연습 모드)', onclick: () => this.toggleGuide('path') }, '〰️ 궤적');
     this.systemBtn = h('button.btn.fine.camera', { hidden: true, title: '파이브앤하프 시스템 보기 (연습 모드)', onclick: () => this.toggleGuide('system') }, '📐 시스템');
     this.systemPanel = h('div.system-panel', { hidden: true });
-    this.el = h('div.scene', {}, h('div.stage', {}, this.canvas, this.renderer.overlay, h('div.view-buttons', {}, this.cameraBtn, this.aerialBtn, this.pathBtn, this.systemBtn), this.systemPanel), h('div.scene-controls', {}, this.spin.el, this.elevation.el, fine, this.power.el));
+    this.el = h('div.scene', {}, h('div.stage', {}, this.canvas, this.renderer.overlay, h('div.view-buttons', {}, this.cameraBtn, this.pathBtn, this.systemBtn), this.systemPanel), h('div.scene-controls', {}, this.spin.el, this.elevation.el, fine, this.power.el));
     this.aim = new AimController(this.canvas, this.renderer, {
       onChange: (s) => this.onAimChange(s),
       onShoot: (s) => this.onShoot(s),
     });
     this.aim.maxElevation = phys.maxCueElevationDeg;
     this.setCameraMode(loadCameraMode());
-    this.setAerial(loadAerial());
     this.loop = new FixedLoop(phys.timeStep, () => this.update(), (alpha, dt) => this.render(alpha, dt));
     this.resizeObserver = new ResizeObserver(() => this.renderer.resize());
     this.resizeObserver.observe(this.canvas);
@@ -156,26 +153,13 @@ export class GameScene {
     return b;
   }
 
-  /** 위 시점(top) or 큐 뒤 시점(cue). In cue view the aim turns by dragging sideways. */
+  /** 위 시점(top) or 큐 뒤 시점(cue). In cue view a drag turns the aim sideways or pulls the cue back. */
   setCameraMode(mode: CameraMode): void {
     this.renderer.cameraMode = mode;
     this.aim.rotateMode = mode === 'cue';
     this.cameraBtn.textContent = mode === 'cue' ? '🎥 큐' : '🗺️ 위';
-    // The top view already looks straight down.
-    this.aerialBtn.hidden = mode === 'top';
     try {
       localStorage.setItem(CAMERA_KEY, mode);
-    } catch {
-      // storage unavailable
-    }
-  }
-
-  /** 항공 보기 on/off: the camera goes straight up over the table right away, also while aiming. */
-  setAerial(on: boolean): void {
-    this.renderer.aerialAim = on;
-    this.aerialBtn.classList.toggle('on', on);
-    try {
-      localStorage.setItem(AERIAL_KEY, on ? '1' : '0');
     } catch {
       // storage unavailable
     }
@@ -502,15 +486,5 @@ function loadCameraMode(): CameraMode {
     return localStorage.getItem(CAMERA_KEY) === 'top' ? 'top' : 'cue';
   } catch {
     return 'cue';
-  }
-}
-
-const AERIAL_KEY = 'breakshot.aerial';
-
-function loadAerial(): boolean {
-  try {
-    return localStorage.getItem(AERIAL_KEY) === '1';
-  } catch {
-    return false;
   }
 }

@@ -20,9 +20,6 @@ export class Renderer3D implements ScreenMapper {
   readonly overlay: HTMLCanvasElement;
   readonly palette: TablePalette;
   cameraMode: CameraMode = 'cue';
-  /** While the balls roll: straight down from above (항공) or the tilted view behind the shot. */
-  /** 항공 보기: look straight down while aiming too (cue view keeps its drag-to-turn aim). */
-  aerialAim = false;
 
   private gl: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
@@ -392,8 +389,7 @@ export class Renderer3D implements ScreenMapper {
     const W = g.width;
     const centre = new THREE.Vector3(L / 2, W / 2, 0);
     // Rolling balls are always watched from straight above so the whole path shows.
-    const aerial = frame.animating || (this.aerialAim && !frame.holdCamera);
-    const overhead = this.cameraMode === 'top' || !this.lastCue || aerial;
+    const overhead = this.cameraMode === 'top' || !this.lastCue || !!frame.animating;
     if (overhead) {
       const ex = L / 2 + g.spec.railWidth;
       const ey = W / 2 + g.spec.railWidth;

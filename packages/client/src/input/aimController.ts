@@ -36,7 +36,9 @@ const DEG = Math.PI / 180;
  * Mouse / pointer and keyboard aiming:
  *  - move: aim at the pointer
  *  - press and pull back, release: shoot (power ∝ pull distance)
- *  - rotate mode (camera behind the cue): drag sideways to turn; shoot with the power bar
+ *  - rotate mode (camera behind the cue): drag sideways to turn, or down to pull the cue back and release to shoot
+ *  - touch in the top view: drag to aim, or press on the cue to pull it back and release to shoot
+ *  - the power bar is a second way to shoot in every mode
  *  - ball in hand: press on the cue ball and drag to place it
  *  - arrow keys: fine aim (0.1°, Shift = 1°); W/A/S/D: spin; Q/E: raise/lower the cue; Esc / right click: cancel
  */
@@ -50,8 +52,8 @@ export class AimController {
   private dragPointer: number | null = null;
   /** Touch / pen: the pointer currently aiming (power comes from the on-screen slider). */
   private touchAim: number | null = null;
-  /** Rotate mode: the pointer turning the aim and its last x (CSS px). */
-  private turning: { pointer: number; x: number } | null = null;
+  /** Rotate mode: the dragging pointer, where it pressed, its last x (CSS px), and what the drag turned out to be. */
+  private stroke: { pointer: number; startX: number; startY: number; x: number; axis: 'turn' | 'pull' | null } | null = null;
   /** Drag sideways to turn instead of pointing at the target (behind-the-cue camera). */
   rotateMode = false;
 
@@ -101,6 +103,7 @@ export class AimController {
   disable(): void {
     this.enabled = false;
     this.pull = null;
+    this.stroke = null;
     this.state.power = 0;
     this.canvas.style.cursor = 'default';
   }
@@ -190,15 +193,44 @@ export class AimController {
       this.emit();
       return;
     }
-    if (this.turning && this.turning.pointer === e.pointerId) {
-      this.state.angle -= (e.clientX - this.turning.x) * CONTROLS.dragAimDegPerPx * DEG;
-      this.turning.x = e.clientX;
-      this.emit();
+    if (this.stroke && this.stroke.pointer === e.pointerId) {
+      this.onStroke(this.stroke, e);
       return;
     }
     if (this.rotateMode) return;
     if (e.pointerType === 'mouse' || this.touchAim === e.pointerId) this.aimAt(w);
   };
+
+  /** Rotate mode: the first few pixels pick turning or pulling, so a straight pull never swings the aim. */
+  private onStroke(stroke: NonNullable<AimController['stroke']>, e: PointerEvent): void {
+    const dx = e.clientX - stroke.startX;
+    const dy = e.clientY - stroke.startY;
+    if (!stroke.axis) {
+      if (Math.hypot(dx, dy) < CONTROLS.strokeLockPixels) return;
+      stroke.axis = Math.abs(dy) > Math.abs(dx) ? 'pull' : 'turn';
+    }
+    if (stroke.axis === 'turn') {
+      this.state.angle -= (e.clientX - stroke.x) * CONTROLS.dragAimDegPerPx * DEG;
+      stroke.x = e.clientX;
+    } else {
+      const blocked = this.state.placing && !this.state.placementValid;
+      this.state.power = blocked ? 0 : Math.max(0, Math.min(1, dy / CONTROLS.pullPixelsForFullPower));
+    }
+    this.emit();
+  }
+
+  /** Top view + touch: is the finger on the cue ball or on the cue behind it? */
+  private touchesCue(e: PointerEvent, cue: Vec2): boolean {
+    const rect = this.canvas.getBoundingClientRect();
+    const p = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    const a = this.view.toScreen(cue);
+    const len = CONTROLS.touchCueGrabLength;
+    const b = this.view.toScreen({ x: cue.x - Math.cos(this.state.angle) * len, y: cue.y - Math.sin(this.state.angle) * len });
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy || 1)));
+    return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy) < CONTROLS.touchCueGrabPixels;
+  }
 
   private aimAt(w: Vec2): void {
     const cue = this.cuePosition();
@@ -222,11 +254,13 @@ export class AimController {
       return;
     }
     if (this.rotateMode) {
-      this.turning = { pointer: e.pointerId, x: e.clientX };
+      this.stroke = { pointer: e.pointerId, startX: e.clientX, startY: e.clientY, x: e.clientX, axis: null };
+      this.state.power = 0;
+      this.emit();
       return;
     }
-    if (e.pointerType !== 'mouse') {
-      // Touch: a tap/drag on the table aims at the finger; power comes from the power slider.
+    if (e.pointerType !== 'mouse' && !(cue && this.touchesCue(e, cue))) {
+      // Touch away from the cue: a tap/drag on the table aims at the finger.
       this.aimAt(w);
       this.dragPointer = null;
       this.touchAim = e.pointerId;
@@ -248,12 +282,13 @@ export class AimController {
       this.touchAim = null;
       return;
     }
-    if (this.turning?.pointer === e.pointerId) {
-      this.turning = null;
+    if (this.stroke?.pointer === e.pointerId) {
+      this.stroke = null;
+    } else if (this.pull?.pointer === e.pointerId) {
+      this.pull = null;
+    } else {
       return;
     }
-    if (!this.pull || this.pull.pointer !== e.pointerId) return;
-    this.pull = null;
     if (!this.enabled) return;
     if (this.state.power < CONTROLS.minShotPower) {
       this.state.power = 0;
@@ -273,7 +308,7 @@ export class AimController {
     this.pull = null;
     this.dragPointer = null;
     this.touchAim = null;
-    this.turning = null;
+    this.stroke = null;
     if (this.state.power !== 0) {
       this.state.power = 0;
       this.emit();
