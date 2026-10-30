@@ -48,12 +48,12 @@ export class AimController {
   maxElevation = 0;
   private enabled = false;
   private ctx: AimContext | null = null;
-  private pull: { start: Vec2; pointer: number } | null = null;
+  private pull: { start: Vec2; pointer: number; touchFrom: { x: number; y: number } | null } | null = null;
   private dragPointer: number | null = null;
   /** Touch / pen: the pointer currently aiming (power comes from the on-screen slider). */
   private touchAim: number | null = null;
-  /** Rotate mode: the dragging pointer, where it pressed, its last x (CSS px), and what the drag turned out to be. */
-  private stroke: { pointer: number; startX: number; startY: number; x: number; axis: 'turn' | 'pull' | null } | null = null;
+  /** Rotate mode: the dragging pointer, where it pressed, its last x (CSS px), what the drag turned out to be, and the pull that gives full power. */
+  private stroke: { pointer: number; startX: number; startY: number; x: number; axis: 'turn' | 'pull' | null; touch: boolean; fullPull: number } | null = null;
   /** Drag sideways to turn instead of pointing at the target (behind-the-cue camera). */
   rotateMode = false;
 
@@ -180,6 +180,13 @@ export class AimController {
       return;
     }
     if (this.pull && this.pull.pointer === e.pointerId) {
+      if (this.pull.touchFrom) {
+        // A finger stops at the screen edge, and near a corner "back" points off the screen: any direction counts.
+        const moved = Math.hypot(e.clientX - this.pull.touchFrom.x, e.clientY - this.pull.touchFrom.y);
+        this.state.power = Math.min(1, moved / CONTROLS.pullPixelsForFullPower);
+        this.emit();
+        return;
+      }
       // Power = how far the pointer moved backwards along the aim line (in screen pixels).
       const a = this.view.toScreen(this.pull.start);
       const b = this.view.toScreen(w);
@@ -214,7 +221,8 @@ export class AimController {
       stroke.x = e.clientX;
     } else {
       const blocked = this.state.placing && !this.state.placementValid;
-      this.state.power = blocked ? 0 : Math.max(0, Math.min(1, dy / CONTROLS.pullPixelsForFullPower));
+      // A finger may run out of screen below the press, so it can pull upwards as well.
+      this.state.power = blocked ? 0 : Math.max(0, Math.min(1, (stroke.touch ? Math.abs(dy) : dy) / stroke.fullPull));
     }
     this.emit();
   }
@@ -254,7 +262,11 @@ export class AimController {
       return;
     }
     if (this.rotateMode) {
-      this.stroke = { pointer: e.pointerId, startX: e.clientX, startY: e.clientY, x: e.clientX, axis: null };
+      const touch = e.pointerType !== 'mouse';
+      // Short screens (a phone on its side): full power must stay within the longer way up or down.
+      const room = Math.max(e.clientY, window.innerHeight - e.clientY) * CONTROLS.touchPullRoomShare;
+      const fullPull = touch ? Math.min(CONTROLS.pullPixelsForFullPower, room) : CONTROLS.pullPixelsForFullPower;
+      this.stroke = { pointer: e.pointerId, startX: e.clientX, startY: e.clientY, x: e.clientX, axis: null, touch, fullPull };
       this.state.power = 0;
       this.emit();
       return;
@@ -267,7 +279,7 @@ export class AimController {
       return;
     }
     if (this.state.placing && !this.state.placementValid) return;
-    this.pull = { start: w, pointer: e.pointerId };
+    this.pull = { start: w, pointer: e.pointerId, touchFrom: e.pointerType === 'mouse' ? null : { x: e.clientX, y: e.clientY } };
     this.state.power = 0;
     this.emit();
   };
