@@ -89,8 +89,6 @@ export const RENDER3D = {
     minElevationDeg: 4,
     maxElevationDeg: 85,
     railClearance: 0.02,
-    /** Rail distance used for the clearance angle once the pulled-back butt is this close or past the rail. */
-    minRailDistance: 0.01,
   },
   ballSegments: { width: 40, height: 28 },
   ballTexturePx: 512,

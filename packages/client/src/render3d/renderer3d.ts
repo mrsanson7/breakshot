@@ -557,12 +557,15 @@ export class Renderer3D implements ScreenMapper {
     for (const m of this.cueMaterials) m.opacity = cue.ghost ? 0.45 : 1;
   }
 
-  /** Butt elevation (rad) needed to clear the rail behind the cue ball at the cue's current pull. */
+  /**
+   * Butt elevation (rad) needed to clear the rail behind the cue ball. Pulling back slides the cue
+   * along its own line, so the angle doesn't depend on the pull and the cue doesn't tilt as it moves.
+   */
   private railClearanceAngle(cue: CueOverlay): number {
     const c = RENDER3D.cue;
-    const toRail = this.distanceToRail(cue.at, -Math.cos(cue.angle), -Math.sin(cue.angle)) - this.R - (c.gap + cue.pull * c.maxPull);
+    const toRail = this.distanceToRail(cue.at, -Math.cos(cue.angle), -Math.sin(cue.angle)) - this.R - c.gap;
     const rise = this.table.railTop + c.railClearance - this.R;
-    return rise > 0 ? Math.atan2(rise, Math.max(toRail, c.minRailDistance)) : 0;
+    return rise > 0 ? Math.atan2(rise, toRail) : 0;
   }
 
   /** Distance from p along (dx, dy) to the outer edge of the cushions. */
