@@ -107,6 +107,16 @@ export const MODELS = {
     caromLarge: 'legs-caromLarge.glb',
     caromMedium: 'legs-caromMedium.glb',
   } satisfies Record<TableId, string>,
+  /** Rail + apron. The inner wall mesh (`RailInnerWall`) must follow `railOpening()`. */
+  rail: {
+    pool9ft: 'rail-pool9ft.glb',
+    caromLarge: 'rail-caromLarge.glb',
+    caromMedium: 'rail-caromMedium.glb',
+  } satisfies Record<TableId, string>,
+  /** Dev check: a rail model whose inner wall strays further than this (m) is rejected. */
+  railTolerance: 0.002,
+  /** Decorations around the pocket holes, for tables that have pockets. */
+  pockets: { pool9ft: 'pockets-pool9ft.glb' } as Partial<Record<TableId, string>>,
   /**
    * Main light once the room (with its lamp over the table centre) is in. Same height as the built-in
    * light so the shadow range still fits; the small offset keeps ball shadows visible from above.

@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "export-outlines": "tsx scripts/export-table-outlines.ts"
   },
   "dependencies": {
     "@breakshot/shared": "workspace:*",
@@ -14,6 +15,7 @@
   },
   "devDependencies": {
     "@types/three": "0.170.0",
+    "tsx": "^4.23.15",
     "vite": "^7.3.7"
   }
 }

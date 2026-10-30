@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3110mm" height="1690mm" viewBox="0 0 3110 1690" fill="none" stroke-width="1.5">
+<rect x="0" y="0" width="3110" height="1690" rx="47.25" stroke="#555"/>
+<polygon points="85.00,1605.00 3025.00,1605.00 3025.00,85.00 85.00,85.00" stroke="#c00"/>
+<rect x="85.00" y="85.00" width="2940" height="1520" stroke="#06c" stroke-dasharray="6 4"/>
+<circle cx="490.00" cy="1647.50" r="7" fill="#999" stroke="none"/>
+<circle cx="490.00" cy="42.50" r="7" fill="#999" stroke="none"/>
+<circle cx="845.00" cy="1647.50" r="7" fill="#999" stroke="none"/>
+<circle cx="845.00" cy="42.50" r="7" fill="#999" stroke="none"/>
+<circle cx="1200.00" cy="1647.50" r="7" fill="#999" stroke="none"/>
+<circle cx="1200.00" cy="42.50" r="7" fill="#999" stroke="none"/>
+<circle cx="1555.00" cy="1647.50" r="7" fill="#999" stroke="none"/>
+<circle cx="1555.00" cy="42.50" r="7" fill="#999" stroke="none"/>
+<circle cx="1910.00" cy="1647.50" r="7" fill="#999" stroke="none"/>
+<circle cx="1910.00" cy="42.50" r="7" fill="#999" stroke="none"/>
+<circle cx="2265.00" cy="1647.50" r="7" fill="#999" stroke="none"/>
+<circle cx="2265.00" cy="42.50" r="7" fill="#999" stroke="none"/>
+<circle cx="2620.00" cy="1647.50" r="7" fill="#999" stroke="none"/>
+<circle cx="2620.00" cy="42.50" r="7" fill="#999" stroke="none"/>
+<circle cx="42.50" cy="1200.00" r="7" fill="#999" stroke="none"/>
+<circle cx="3067.50" cy="1200.00" r="7" fill="#999" stroke="none"/>
+<circle cx="42.50" cy="845.00" r="7" fill="#999" stroke="none"/>
+<circle cx="3067.50" cy="845.00" r="7" fill="#999" stroke="none"/>
+<circle cx="42.50" cy="490.00" r="7" fill="#999" stroke="none"/>
+<circle cx="3067.50" cy="490.00" r="7" fill="#999" stroke="none"/>
+</svg>

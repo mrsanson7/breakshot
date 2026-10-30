@@ -10,6 +10,8 @@ export interface TableMeshes {
   cushionTop: number;
   /** Height of the rail top (m). */
   railTop: number;
+  /** The built-in rail and apron, replaced when a rail model loads. */
+  railParts: THREE.Mesh[];
 }
 
 export interface TablePalette {
@@ -118,7 +120,7 @@ export function buildTable(geom: TableGeometry, palette: TablePalette): TableMes
     group.add(m);
   }
 
-  return { group, felt, cushion, cushionTop, railTop };
+  return { group, felt, cushion, cushionTop, railTop, railParts: [railMesh, skirt] };
 }
 
 /** Cushion cross-section in plan: nose segment, jaw faces, then the back line `cw` behind the nose. */
@@ -150,7 +152,7 @@ function cushionPolygon(seg: CushionSegment, all: CushionSegment[], cw: number):
  * Outline (counter-clockwise) of the rail's inner opening: the rectangle at the cushion back line
  * united with the pocket circles that bite into it.
  */
-function railOpening(L: number, W: number, cw: number, pockets: Pocket[]): Vec2[] {
+export function railOpening(L: number, W: number, cw: number, pockets: Pocket[]): Vec2[] {
   const corners: Vec2[] = [
     { x: -cw, y: -cw },
     { x: L + cw, y: -cw },

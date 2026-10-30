@@ -3,7 +3,8 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import type { AimPrediction, BallDef, BallState, TableGeometry, Vec2 } from '@breakshot/shared';
 import { GUIDE, MODELS, RENDER3D } from '../config';
 import { loadModel } from './models';
-import { buildTable, type TableMeshes, type TablePalette } from './table';
+import { railWallDeviation, type Point2 } from './railCheck';
+import { buildTable, railOpening, type TableMeshes, type TablePalette } from './table';
 import { ballTexture } from './textures';
 import type { CameraMode, CueOverlay, FloatingText, GuideOverlay, RenderFrame, ScreenMapper } from './types';
 
@@ -186,14 +187,20 @@ export class Renderer3D implements ScreenMapper {
   /** The game is already playable; each model simply appears when it arrives. */
   private async loadModels(): Promise<void> {
     const { length: L, width: W } = this.geom;
-    const [room, legs, cue] = await Promise.all([
+    const id = this.geom.spec.id;
+    const pocketsFile = MODELS.pockets[id];
+    const [room, legs, cue, rail, pockets] = await Promise.all([
       loadModel(MODELS.room, { cast: false, receive: true }),
-      loadModel(MODELS.legs[this.geom.spec.id], { cast: false, receive: false }),
+      loadModel(MODELS.legs[id], { cast: false, receive: false }),
       loadModel(MODELS.cue, { cast: true, receive: false }),
+      loadModel(MODELS.rail[id], { cast: false, receive: true }),
+      pocketsFile ? loadModel(pocketsFile, { cast: false, receive: false }) : null,
     ]);
     if (this.disposed) return;
     if (legs) this.scene.add(legs);
     if (cue) this.useCueModel(cue);
+    if (rail) this.useRailModel(rail);
+    if (pockets) this.scene.add(pockets);
     if (room) {
       // The room's origin is the table centre.
       room.position.set(L / 2, W / 2, 0);
@@ -207,6 +214,46 @@ export class Renderer3D implements ScreenMapper {
       const s = MODELS.lampSun;
       this.sun.position.set(L / 2 + s.offsetX, W / 2 + s.offsetY, s.height);
     }
+  }
+
+  /** Swap the built-in rail and apron for the model. In development a misfitting model is refused. */
+  private useRailModel(rail: THREE.Group): void {
+    if (import.meta.env.DEV) {
+      const deviation = this.railDeviation(rail);
+      if (deviation > MODELS.railTolerance) {
+        console.warn(`Rail model is ${(deviation * 1000).toFixed(1)} mm off railOpening(), keeping the built-in rail`);
+        return;
+      }
+    }
+    for (const part of this.table.railParts) {
+      this.table.group.remove(part);
+      part.geometry.dispose();
+    }
+    this.scene.add(rail);
+  }
+
+  /** How far the model's inner wall strays from the opening the cushions and pockets expect (m). */
+  private railDeviation(rail: THREE.Group): number {
+    const { length: L, width: W, spec, pockets } = this.geom;
+    const edges: [Point2, Point2][] = [];
+    const v = new THREE.Vector3();
+    rail.updateWorldMatrix(true, true);
+    rail.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh || !mesh.name.startsWith('RailInnerWall')) return;
+      const pos = mesh.geometry.attributes.position;
+      const index = mesh.geometry.index;
+      const at = (i: number): Point2 => {
+        v.fromBufferAttribute(pos, index ? index.getX(i) : i).applyMatrix4(mesh.matrixWorld);
+        return { x: v.x, y: v.y };
+      };
+      const count = index ? index.count : pos.count;
+      for (let i = 0; i + 2 < count; i += 3) {
+        const [a, b, c] = [at(i), at(i + 1), at(i + 2)];
+        edges.push([a, b], [b, c], [c, a]);
+      }
+    });
+    return railWallDeviation(edges, railOpening(L, W, spec.cushionWidth, pockets));
   }
 
   setFelt(color: string | null): void {
