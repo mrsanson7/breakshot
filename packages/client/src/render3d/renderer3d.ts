@@ -413,7 +413,11 @@ export class Renderer3D implements ScreenMapper {
       const dy = Math.sin(angle);
       const v = RENDER3D.cueView;
       // A raised cue would fill the screen: lift the camera and step a little to the side with it.
-      const lift = Math.sin((frame.cue.elevation ?? 0) * DEG);
+      // Near a rail the cue rises by itself, so the camera follows that angle too. Below the cue's
+      // minimum elevation nothing has been raised and the camera keeps the normal view.
+      const clearance = this.railClearanceAngle(frame.cue);
+      const raised = Math.max((frame.cue.elevation ?? 0) * DEG, clearance > RENDER3D.cue.minElevationDeg * DEG ? clearance : 0);
+      const lift = Math.sin(Math.min(raised, RENDER3D.cue.maxElevationDeg * DEG));
       const side = v.raisedSideStep * lift;
       this.want.pos.set(at.x - dx * v.distance + dy * side, at.y - dy * v.distance - dx * side, v.height + v.raisedLift * lift);
       this.want.target.set(at.x + dx * v.lookAhead, at.y + dy * v.lookAhead, 0);
@@ -539,12 +543,7 @@ export class Renderer3D implements ScreenMapper {
       sx /= sl;
       sy /= sl;
     }
-    // Raise the butt at least enough to clear the rail behind the cue ball.
-    let elev = Math.max(c.minElevationDeg, cue.elevation ?? 0) * DEG;
-    const toRail = this.distanceToRail(cue.at, -dx, -dy) - R - pull;
-    const rise = this.table.railTop + c.railClearance - R;
-    if (toRail > 0.01 && rise > 0) elev = Math.max(elev, Math.atan2(rise, toRail));
-    elev = Math.min(elev, 85 * DEG);
+    const elev = Math.min(Math.max(c.minElevationDeg * DEG, (cue.elevation ?? 0) * DEG, this.railClearanceAngle(cue)), RENDER3D.cue.maxElevationDeg * DEG);
     // Same geometry as Simulation.strike: cue axis c, tip offset ê ⟂ c, contact on the sphere.
     const ca = Math.cos(elev);
     const sa = Math.sin(elev);
@@ -560,6 +559,14 @@ export class Renderer3D implements ScreenMapper {
     this.cue.rotation.set(0, elev, cue.angle);
     this.cue.visible = true;
     for (const m of this.cueMaterials) m.opacity = cue.ghost ? 0.45 : 1;
+  }
+
+  /** Butt elevation (rad) needed to clear the rail behind the cue ball at the cue's current pull. */
+  private railClearanceAngle(cue: CueOverlay): number {
+    const c = RENDER3D.cue;
+    const toRail = this.distanceToRail(cue.at, -Math.cos(cue.angle), -Math.sin(cue.angle)) - this.R - (c.gap + cue.pull * c.maxPull);
+    const rise = this.table.railTop + c.railClearance - this.R;
+    return rise > 0 ? Math.atan2(rise, Math.max(toRail, c.minRailDistance)) : 0;
   }
 
   /** Distance from p along (dx, dy) to the outer edge of the cushions. */
