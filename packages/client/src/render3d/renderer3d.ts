@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { AimPrediction, BallDef, BallState, TableGeometry, Vec2 } from '@breakshot/shared';
-import { GUIDE, RENDER3D } from '../config';
+import { GUIDE, MODELS, RENDER3D } from '../config';
+import { loadModel } from './models';
 import { buildTable, type TableMeshes, type TablePalette } from './table';
 import { ballTexture } from './textures';
 import type { CameraMode, CueOverlay, FloatingText, GuideOverlay, RenderFrame, ScreenMapper } from './types';
@@ -41,6 +42,10 @@ export class Renderer3D implements ScreenMapper {
   private ringPool: THREE.Mesh[] = [];
   private raycaster = new THREE.Raycaster();
   private ballPlane: THREE.Plane;
+  private sun: THREE.DirectionalLight;
+  /** Hall around the table; hidden whenever the camera looks straight down. Null until loaded. */
+  private room: THREE.Group | null = null;
+  private disposed = false;
 
   private cssW = 1;
   private cssH = 1;
@@ -97,9 +102,11 @@ export class Renderer3D implements ScreenMapper {
     sun.shadow.normalBias = 0.002;
     sun.shadow.radius = 3;
     this.scene.add(sun, sun.target);
+    this.sun = sun;
 
     this.table = buildTable(geom, this.palette);
     this.scene.add(this.table.group);
+    void this.loadModels();
 
     const sphere = new THREE.SphereGeometry(this.R, RENDER3D.ballSegments.width, RENDER3D.ballSegments.height);
     for (const def of ballDefs) {
@@ -173,6 +180,22 @@ export class Renderer3D implements ScreenMapper {
     this.ballPlane = new THREE.Plane(UP.clone(), -this.R);
   }
 
+  /** The game is already playable; each model simply appears when it arrives. */
+  private async loadModels(): Promise<void> {
+    const { length: L, width: W } = this.geom;
+    const [room, legs] = await Promise.all([loadModel(MODELS.room, true), loadModel(MODELS.legs[this.geom.spec.id], false)]);
+    if (this.disposed) return;
+    if (legs) this.scene.add(legs);
+    if (room) {
+      // The room's origin is the table centre.
+      room.position.set(L / 2, W / 2, 0);
+      this.scene.add(room);
+      this.room = room;
+      const s = MODELS.lampSun;
+      this.sun.position.set(L / 2 + s.offsetX, W / 2 + s.offsetY, s.height);
+    }
+  }
+
   setFelt(color: string | null): void {
     this.palette.felt = color ?? this.geom.spec.colors.felt;
     this.table.felt.color.set(this.palette.felt);
@@ -197,6 +220,7 @@ export class Renderer3D implements ScreenMapper {
   }
 
   dispose(): void {
+    this.disposed = true;
     this.scene.traverse((o) => {
       const m = o as THREE.Mesh;
       if (m.geometry) m.geometry.dispose();
@@ -309,7 +333,10 @@ export class Renderer3D implements ScreenMapper {
     const centre = new THREE.Vector3(L / 2, W / 2, 0);
     // Rolling balls are always watched from straight above so the whole path shows.
     const aerial = frame.animating || (this.aerialAim && !frame.holdCamera);
-    if (this.cameraMode === 'top' || !this.lastCue || aerial) {
+    const overhead = this.cameraMode === 'top' || !this.lastCue || aerial;
+    // The lamp hangs between an overhead camera and the table.
+    if (this.room) this.room.visible = !overhead;
+    if (overhead) {
       const ex = L / 2 + g.spec.railWidth;
       const ey = W / 2 + g.spec.railWidth;
       const tanV = Math.tan((RENDER3D.fovDeg / 2) * DEG);

@@ -1,3 +1,5 @@
+import type { TableId } from '@breakshot/shared';
+
 /** Client-only UI tuning (input feel). Game numbers live in @breakshot/shared config. */
 export const CONTROLS = {
   /** Arrow keys: fine aim step (deg); with Shift: coarse step. */
@@ -91,6 +93,23 @@ export const RENDER3D = {
   /** Wooden apron below the bed. */
   skirtDepth: 0.2,
   ringPool: 16,
+} as const;
+
+/** Blender-made models in public/models (see docs/VISUAL_UPGRADE.md). `?models=off` also turns them off. */
+export const MODELS = {
+  enabled: true,
+  dir: 'models/',
+  room: 'room.glb',
+  legs: {
+    pool9ft: 'legs-pool9ft.glb',
+    caromLarge: 'legs-caromLarge.glb',
+    caromMedium: 'legs-caromMedium.glb',
+  } satisfies Record<TableId, string>,
+  /**
+   * Main light once the room (with its lamp over the table centre) is in. Same height as the built-in
+   * light so the shadow range still fits; the small offset keeps ball shadows visible from above.
+   */
+  lampSun: { offsetX: 0.08, offsetY: 0.06, height: 3 },
 } as const;
 
 /**
