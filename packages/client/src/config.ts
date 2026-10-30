@@ -110,6 +110,10 @@ export const MODELS = {
    * light so the shadow range still fits; the small offset keeps ball shadows visible from above.
    */
   lampSun: { offsetX: 0.08, offsetY: 0.06, height: 3 },
+  /** The room stays hidden while the camera is above this height (m above the felt), e.g. coming down from the top view. */
+  roomMaxCameraHeight: 1.3,
+  /** The lamp and its cords hide while the camera is this close to the lamp (m). */
+  lampClearance: 0.35,
 } as const;
 
 /**

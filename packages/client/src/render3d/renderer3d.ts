@@ -45,6 +45,9 @@ export class Renderer3D implements ScreenMapper {
   private sun: THREE.DirectionalLight;
   /** Hall around the table; hidden whenever the camera looks straight down. Null until loaded. */
   private room: THREE.Group | null = null;
+  /** Lamp and cord meshes inside the room, and the lamp's bounds (without the cords). */
+  private lampParts: THREE.Object3D[] = [];
+  private lampBox = new THREE.Box3();
   private disposed = false;
 
   private cssW = 1;
@@ -191,6 +194,11 @@ export class Renderer3D implements ScreenMapper {
       room.position.set(L / 2, W / 2, 0);
       this.scene.add(room);
       this.room = room;
+      room.updateWorldMatrix(true, true);
+      room.traverse((o) => {
+        if (o.name.startsWith('Lamp')) this.lampBox.expandByObject(o);
+        if (o.name.startsWith('Lamp') || o.name.startsWith('Cord')) this.lampParts.push(o);
+      });
       const s = MODELS.lampSun;
       this.sun.position.set(L / 2 + s.offsetX, W / 2 + s.offsetY, s.height);
     }
@@ -334,8 +342,6 @@ export class Renderer3D implements ScreenMapper {
     // Rolling balls are always watched from straight above so the whole path shows.
     const aerial = frame.animating || (this.aerialAim && !frame.holdCamera);
     const overhead = this.cameraMode === 'top' || !this.lastCue || aerial;
-    // The lamp hangs between an overhead camera and the table.
-    if (this.room) this.room.visible = !overhead;
     if (overhead) {
       const ex = L / 2 + g.spec.railWidth;
       const ey = W / 2 + g.spec.railWidth;
@@ -393,6 +399,16 @@ export class Renderer3D implements ScreenMapper {
     this.camera.up.copy(this.cam.up).normalize();
     this.camera.lookAt(this.cam.target);
     this.camera.updateMatrixWorld();
+    this.updateRoomVisibility(overhead);
+  }
+
+  /** Keep the room out of overhead views and camera moves, and never let the camera run into the lamp. */
+  private updateRoomVisibility(overhead: boolean): void {
+    if (!this.room) return;
+    const pos = this.camera.position;
+    this.room.visible = !overhead && pos.z <= MODELS.roomMaxCameraHeight;
+    const lampVisible = this.lampBox.distanceToPoint(pos) >= MODELS.lampClearance;
+    for (const part of this.lampParts) part.visible = lampVisible;
   }
 
   // -------------------------------------------------------------------------------------------
