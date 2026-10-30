@@ -7,15 +7,15 @@ const modelsEnabled = (): boolean => MODELS.enabled && new URLSearchParams(locat
 
 /**
  * Load a Blender-made .glb from public/models, or null when models are off or the file can't be
- * loaded (the code-built graphics then stay as they are). Shadows: models only receive them.
+ * loaded (the code-built graphics then stay as they are). Only the cue casts shadows.
  */
-export async function loadModel(file: string, receiveShadow: boolean): Promise<THREE.Group | null> {
+export async function loadModel(file: string, shadows: { cast: boolean; receive: boolean }): Promise<THREE.Group | null> {
   if (!modelsEnabled()) return null;
   try {
     const gltf = await new GLTFLoader().loadAsync(`${import.meta.env.BASE_URL}${MODELS.dir}${file}`);
     gltf.scene.traverse((o) => {
-      o.castShadow = false;
-      o.receiveShadow = receiveShadow;
+      o.castShadow = shadows.cast;
+      o.receiveShadow = shadows.receive;
     });
     // glTF is Y-up, the game world is Z-up. This is the only place that converts between them.
     const root = new THREE.Group();

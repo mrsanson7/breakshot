@@ -100,6 +100,8 @@ export const MODELS = {
   enabled: true,
   dir: 'models/',
   room: 'room.glb',
+  /** Origin at the tip end, running along +Y; sized to RENDER3D.cue. */
+  cue: 'cue.glb',
   legs: {
     pool9ft: 'legs-pool9ft.glb',
     caromLarge: 'legs-caromLarge.glb',

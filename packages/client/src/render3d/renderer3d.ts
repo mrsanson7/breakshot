@@ -186,9 +186,14 @@ export class Renderer3D implements ScreenMapper {
   /** The game is already playable; each model simply appears when it arrives. */
   private async loadModels(): Promise<void> {
     const { length: L, width: W } = this.geom;
-    const [room, legs] = await Promise.all([loadModel(MODELS.room, true), loadModel(MODELS.legs[this.geom.spec.id], false)]);
+    const [room, legs, cue] = await Promise.all([
+      loadModel(MODELS.room, { cast: false, receive: true }),
+      loadModel(MODELS.legs[this.geom.spec.id], { cast: false, receive: false }),
+      loadModel(MODELS.cue, { cast: true, receive: false }),
+    ]);
     if (this.disposed) return;
     if (legs) this.scene.add(legs);
+    if (cue) this.useCueModel(cue);
     if (room) {
       // The room's origin is the table centre.
       room.position.set(L / 2, W / 2, 0);
@@ -447,6 +452,27 @@ export class Renderer3D implements ScreenMapper {
     g.add(inner);
     g.visible = false;
     return g;
+  }
+
+  /** Swap the built-in cylinders for the model; `updateCue` keeps moving the same outer group. */
+  private useCueModel(model: THREE.Group): void {
+    const inner = this.cue.children[0];
+    for (const part of [...inner.children]) {
+      inner.remove(part);
+      (part as THREE.Mesh).geometry.dispose();
+    }
+    for (const m of this.cueMaterials) m.dispose();
+    // Clones, all transparent: the opponent's cue is drawn see-through.
+    this.cueMaterials = [];
+    model.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const m = (mesh.material as THREE.MeshStandardMaterial).clone();
+      m.transparent = true;
+      mesh.material = m;
+      this.cueMaterials.push(m);
+    });
+    inner.add(model);
   }
 
   private updateCue(cue: CueOverlay | undefined): void {
