@@ -189,6 +189,9 @@ button, select, input { font: inherit; color: inherit; }
 .view-buttons .btn { pointer-events: auto; }
 .btn.camera { font-size: 13px; padding: 6px 10px; background: rgba(20, 27, 33, .85); }
 .btn.camera.on { border-color: #ff9ad5; color: #ffd1ec; box-shadow: 0 0 0 1px #ff9ad5 inset; }
+.cancel-zone { position: fixed; z-index: 5; display: flex; align-items: center; justify-content: center; text-align: center; border: 2px dashed rgba(255, 255, 255, .6); border-radius: 50%; color: #fff; font-size: 11px; line-height: 1.2; text-shadow: 0 1px 2px #000; pointer-events: none; }
+.cancel-zone.armed { border-style: solid; border-color: #ff9d6c; background: rgba(255, 110, 60, .28); font-weight: 700; }
+.cancel-zone[hidden] { display: none; }
 .system-panel { position: absolute; left: 8px; bottom: 8px; max-width: min(320px, 70%); padding: 8px 10px; border-radius: 8px; background: rgba(12, 16, 20, .82); color: #e8eef2; font-size: 12px; line-height: 1.45; pointer-events: none; }
 .system-panel b { color: #ffa64d; }
 .system-panel[hidden] { display: none; }

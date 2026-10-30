@@ -9,6 +9,10 @@ export const CONTROLS = {
   pullPixelsForFullPower: 240,
   /** Behind-the-cue camera: a drag decides between turning and pulling after this many CSS pixels. */
   strokeLockPixels: 8,
+  /** Touch: a pull that ends within this many CSS pixels of where it started is a cancel, and power starts beyond it. */
+  touchCancelPixels: 40,
+  /** Power bar: sliding this many CSS pixels off the bar cancels. */
+  powerBarCancelPixels: 48,
   /** Behind-the-cue camera + touch: full power needs at most this share of the room to the farther screen edge. */
   touchPullRoomShare: 0.8,
   /** Top view + touch: pressing this close (CSS px) to the cue ball or the cue behind it pulls the cue. */

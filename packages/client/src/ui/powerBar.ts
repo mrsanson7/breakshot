@@ -1,8 +1,9 @@
+import { CONTROLS } from '../config';
 import { h } from './dom';
 
 /**
  * Power gauge. Shows the power while the cue is pulled back on the table; it is also a second
- * way to shoot: drag along the bar to set power, release to shoot.
+ * way to shoot: drag along the bar to set power, release to shoot. Sliding off the bar cancels.
  */
 export class PowerBar {
   readonly el: HTMLDivElement;
@@ -15,7 +16,7 @@ export class PowerBar {
   constructor(private readonly handlers: { onDrag(power: number): void; onRelease(power: number): void }) {
     this.fill = h('div.power-fill');
     this.label = h('span.power-label', {}, '0%');
-    const track = h('div.power-track', { title: '보조 조작: 이 막대를 끌었다 놓아도 칩니다 (기본은 테이블에서 큐를 뒤로 당겼다 놓기)' }, this.fill);
+    const track = h('div.power-track', { title: '보조 조작: 이 막대를 끌었다 놓아도 칩니다 (기본은 테이블에서 큐를 뒤로 당겼다 놓기). 막대 밖으로 빼면 취소' }, this.fill);
     this.el = h('div.power', {}, h('span.power-title', {}, '파워'), track, this.label);
     track.addEventListener('pointerdown', (e) => {
       if (!this.enabled) return;
@@ -46,8 +47,11 @@ export class PowerBar {
     // Vertical bar on desktop (drag down), horizontal bar on narrow screens (drag right).
     const horizontal = r.width > r.height;
     const f = horizontal ? (e.clientX - r.left) / r.width : (e.clientY - r.top) / r.height;
-    const p = Math.max(0, Math.min(1, f));
+    const off = horizontal ? Math.max(r.top - e.clientY, e.clientY - r.bottom) : Math.max(r.left - e.clientX, e.clientX - r.right);
+    const cancelled = off > CONTROLS.powerBarCancelPixels;
+    const p = cancelled ? 0 : Math.max(0, Math.min(1, f));
     this.set(p);
     this.handlers.onDrag(p);
+    if (cancelled) this.label.textContent = '취소';
   }
 }

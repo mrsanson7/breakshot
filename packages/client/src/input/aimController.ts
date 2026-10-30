@@ -13,6 +13,8 @@ export interface AimState {
   /** Ball-in-hand position being dragged (null when not placing). */
   placing: Vec2 | null;
   placementValid: boolean;
+  /** Where a touch pull started (client px), for drawing its cancel zone; null otherwise. */
+  touchPull: { x: number; y: number } | null;
 }
 
 export interface AimContext {
@@ -32,18 +34,22 @@ export interface AimCallbacks {
 
 const DEG = Math.PI / 180;
 
+/** Touch pull distance (CSS px) to power: nothing inside the cancel zone, full power at `full`. */
+const touchPower = (moved: number, full: number): number => Math.max(0, Math.min(1, (moved - CONTROLS.touchCancelPixels) / (full - CONTROLS.touchCancelPixels)));
+
 /**
  * Mouse / pointer and keyboard aiming:
  *  - move: aim at the pointer
  *  - press and pull back, release: shoot (power ∝ pull distance)
  *  - rotate mode (camera behind the cue): drag sideways to turn, or down to pull the cue back and release to shoot
  *  - touch in the top view: drag to aim, or press on the cue to pull it back and release to shoot
+ *  - touch pulls cancel when released near where they started, or when another finger taps the screen
  *  - the power bar is a second way to shoot in every mode
  *  - ball in hand: press on the cue ball and drag to place it
  *  - arrow keys: fine aim (0.1°, Shift = 1°); W/A/S/D: spin; Q/E: raise/lower the cue; Esc / right click: cancel
  */
 export class AimController {
-  state: AimState = { angle: 0, power: 0, spinX: 0, spinY: 0, elevation: 0, placing: null, placementValid: true };
+  state: AimState = { angle: 0, power: 0, spinX: 0, spinY: 0, elevation: 0, placing: null, placementValid: true, touchPull: null };
   /** Steepest elevation allowed (deg). */
   maxElevation = 0;
   private enabled = false;
@@ -71,6 +77,7 @@ export class AimController {
       this.cancel();
     });
     window.addEventListener('keydown', this.onKey);
+    window.addEventListener('pointerdown', this.onOtherFinger, true);
   }
 
   dispose(): void {
@@ -79,6 +86,7 @@ export class AimController {
     this.canvas.removeEventListener('pointerup', this.onUp);
     this.canvas.removeEventListener('pointercancel', this.cancel);
     window.removeEventListener('keydown', this.onKey);
+    window.removeEventListener('pointerdown', this.onOtherFinger, true);
   }
 
   /** Enable input for a turn. Keeps the previous aim angle and spin for convenience. */
@@ -106,6 +114,10 @@ export class AimController {
     this.stroke = null;
     this.state.power = 0;
     this.canvas.style.cursor = 'default';
+    if (this.state.touchPull) {
+      this.state.touchPull = null;
+      this.emit();
+    }
   }
 
   /** The player is dragging the cue ball (ball in hand). */
@@ -183,7 +195,7 @@ export class AimController {
       if (this.pull.touchFrom) {
         // A finger stops at the screen edge, and near a corner "back" points off the screen: any direction counts.
         const moved = Math.hypot(e.clientX - this.pull.touchFrom.x, e.clientY - this.pull.touchFrom.y);
-        this.state.power = Math.min(1, moved / CONTROLS.pullPixelsForFullPower);
+        this.state.power = touchPower(moved, CONTROLS.pullPixelsForFullPower);
         this.emit();
         return;
       }
@@ -222,7 +234,9 @@ export class AimController {
     } else {
       const blocked = this.state.placing && !this.state.placementValid;
       // A finger may run out of screen below the press, so it can pull upwards as well.
-      this.state.power = blocked ? 0 : Math.max(0, Math.min(1, (stroke.touch ? Math.abs(dy) : dy) / stroke.fullPull));
+      const power = stroke.touch ? touchPower(Math.abs(dy), stroke.fullPull) : Math.max(0, Math.min(1, dy / stroke.fullPull));
+      this.state.power = blocked ? 0 : power;
+      if (stroke.touch) this.state.touchPull = { x: stroke.startX, y: stroke.startY };
     }
     this.emit();
   }
@@ -279,7 +293,9 @@ export class AimController {
       return;
     }
     if (this.state.placing && !this.state.placementValid) return;
-    this.pull = { start: w, pointer: e.pointerId, touchFrom: e.pointerType === 'mouse' ? null : { x: e.clientX, y: e.clientY } };
+    const touchFrom = e.pointerType === 'mouse' ? null : { x: e.clientX, y: e.clientY };
+    this.pull = { start: w, pointer: e.pointerId, touchFrom };
+    this.state.touchPull = touchFrom;
     this.state.power = 0;
     this.emit();
   };
@@ -301,6 +317,10 @@ export class AimController {
     } else {
       return;
     }
+    if (this.state.touchPull) {
+      this.state.touchPull = null;
+      this.emit();
+    }
     if (!this.enabled) return;
     if (this.state.power < CONTROLS.minShotPower) {
       this.state.power = 0;
@@ -321,10 +341,20 @@ export class AimController {
     this.dragPointer = null;
     this.touchAim = null;
     this.stroke = null;
-    if (this.state.power !== 0) {
+    if (this.state.power !== 0 || this.state.touchPull) {
       this.state.power = 0;
+      this.state.touchPull = null;
       this.emit();
     }
+  };
+
+  /** A second finger anywhere on the screen calls off a pull that is under way. */
+  private onOtherFinger = (e: PointerEvent): void => {
+    if (e.pointerType === 'mouse') return;
+    const active = this.pull?.pointer ?? (this.stroke?.axis === 'pull' ? this.stroke.pointer : null);
+    if (active === null || active === e.pointerId) return;
+    this.cancel();
+    e.stopPropagation();
   };
 
   private onKey = (e: KeyboardEvent): void => {

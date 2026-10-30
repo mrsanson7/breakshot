@@ -75,6 +75,7 @@ export class GameScene {
   private pathBtn: HTMLButtonElement;
   private systemBtn: HTMLButtonElement;
   private systemPanel: HTMLDivElement;
+  private cancelZone: HTMLDivElement;
   /** Practice guide switches (off in online games). */
   private guideAllowed = false;
   private showPath = false;
@@ -118,7 +119,8 @@ export class GameScene {
     this.pathBtn = h('button.btn.fine.camera', { hidden: true, title: '실제로 굴러갈 길 보기 (연습 모드)', onclick: () => this.toggleGuide('path') }, '〰️ 궤적');
     this.systemBtn = h('button.btn.fine.camera', { hidden: true, title: '파이브앤하프 시스템 보기 (연습 모드)', onclick: () => this.toggleGuide('system') }, '📐 시스템');
     this.systemPanel = h('div.system-panel', { hidden: true });
-    this.el = h('div.scene', {}, h('div.stage', {}, this.canvas, this.renderer.overlay, h('div.view-buttons', {}, this.cameraBtn, this.pathBtn, this.systemBtn), this.systemPanel), h('div.scene-controls', {}, this.spin.el, this.elevation.el, fine, this.power.el));
+    this.cancelZone = h('div.cancel-zone', { hidden: true });
+    this.el = h('div.scene', {}, h('div.stage', {}, this.canvas, this.renderer.overlay, h('div.view-buttons', {}, this.cameraBtn, this.pathBtn, this.systemBtn), this.systemPanel, this.cancelZone), h('div.scene-controls', {}, this.spin.el, this.elevation.el, fine, this.power.el));
     this.aim = new AimController(this.canvas, this.renderer, {
       onChange: (s) => this.onAimChange(s),
       onShoot: (s) => this.onShoot(s),
@@ -447,11 +449,26 @@ export class GameScene {
     this.onAimChange({ ...this.aim.state });
   }
 
+  /** Touch pull: a ring where it started. Letting go inside the ring cancels the shot. */
+  private updateCancelZone(s: AimState): void {
+    const z = this.cancelZone;
+    z.hidden = !s.touchPull;
+    if (!s.touchPull) return;
+    const size = CONTROLS.touchCancelPixels * 2;
+    z.style.width = z.style.height = `${size}px`;
+    z.style.left = `${s.touchPull.x - size / 2}px`;
+    z.style.top = `${s.touchPull.y - size / 2}px`;
+    const armed = s.power === 0;
+    z.classList.toggle('armed', armed);
+    z.textContent = armed ? '놓으면 취소' : '취소';
+  }
+
   private onAimChange(s: AimState): void {
     this.aimState = s;
     this.spin.set(s.spinX, s.spinY);
     this.elevation.set(s.elevation);
     this.power.set(s.power);
+    this.updateCancelZone(s);
     const assist = this.turn ? AIM_ASSIST[this.turn.assist] : null;
     if (assist && this.turn) {
       const balls = s.placing
